@@ -10,8 +10,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.PsiRecursiveElementWalkingVisitor
-import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.name.FqName
+
 
 class ChatService(private val project: Project) {
 
@@ -114,15 +113,15 @@ class ChatService(private val project: Project) {
 
             val symbols = mutableListOf<SymbolInfo>()
 
-            psiFile.accept(object : PsiRecursiveElementWalkingVisitor() {
-                override fun visitElement(element: PsiElement) {
-                    val symbolInfo = getSymbolInfo(element)
-                    if (symbolInfo != null) {
-                        symbols.add(symbolInfo)
-                    }
-                    super.visitElement(element)
-                }
-            })
+//            psiFile.accept(object : PsiRecursiveElementWalkingVisitor() {
+//                override fun visitElement(element: PsiElement) {
+//                    val symbolInfo = getSymbolInfo(element)
+//                    if (symbolInfo != null) {
+//                        symbols.add(symbolInfo)
+//                    }
+//                    super.visitElement(element)
+//                }
+//            })
 
             builder.append("文件: ").append(virtualFile.name).append("\n")
 
@@ -157,109 +156,6 @@ class ChatService(private val project: Project) {
         val fullQualifiedName: String
     )
 
-    private fun getSymbolInfo(element: PsiElement): SymbolInfo? {
-        return when (element) {
-            is KtClass -> {
-                val fqName =
-                    element.fqName?.asString() ?: "${element.containingKtFile.packageFqName.asString()}.${element.name}"
-                SymbolInfo(
-                    name = element.name ?: return null,
-                    type = when {
-                        element.isInterface() -> "接口"
-                        element.isEnum() -> "枚举"
-                        element.isAnnotation() -> "注解"
-                        element.isSealed() -> "密封类"
-                        element.isData() -> "数据类"
-                        element.isInner() -> "内部类"
-                        else -> "类"
-                    },
-                    fullQualifiedName = fqName
-                )
-            }
-
-            is KtObjectDeclaration -> {
-                val fqName =
-                    element.fqName?.asString() ?: "${element.containingKtFile.packageFqName.asString()}.${element.name}"
-                SymbolInfo(
-                    name = element.name ?: return null,
-                    type = if (element.isCompanion()) "伴生对象" else "对象",
-                    fullQualifiedName = fqName
-                )
-            }
-
-            is KtFunction -> {
-                val packageName = element.containingKtFile.packageFqName.asString()
-                val name = element.name ?: return null
-                val fullName = if (packageName.isNotEmpty()) {
-                    "$packageName.$name"
-                } else {
-                    name
-                }
-                SymbolInfo(
-                    name = name,
-                    type = "函数",
-                    fullQualifiedName = fullName
-                )
-            }
-
-            is KtProperty -> {
-                val packageName = element.containingKtFile.packageFqName.asString()
-                val name = element.name ?: return null
-                val fullName = if (packageName.isNotEmpty()) {
-                    "$packageName.$name"
-                } else {
-                    name
-                }
-                SymbolInfo(
-                    name = name,
-                    type = "属性",
-                    fullQualifiedName = fullName
-                )
-            }
-
-            is KtParameter -> {
-                val functionName = element.ownerFunction?.name
-                val name = element.name ?: return null
-                val fullName = if (functionName != null) {
-                    "$functionName.$name"
-                } else {
-                    name
-                }
-                SymbolInfo(
-                    name = name,
-                    type = "参数",
-                    fullQualifiedName = fullName
-                )
-            }
-
-            is KtTypeAlias -> {
-                val fqName =
-                    element.fqName?.asString() ?: "${element.containingKtFile.packageFqName.asString()}.${element.name}"
-                SymbolInfo(
-                    name = element.name ?: return null,
-                    type = "类型别名",
-                    fullQualifiedName = fqName
-                )
-            }
-
-            is KtVariableDeclaration -> {
-                val packageName = element.containingKtFile.packageFqName.asString()
-                val name = element.name ?: return null
-                val fullName = if (packageName.isNotEmpty()) {
-                    "$packageName.$name"
-                } else {
-                    name
-                }
-                SymbolInfo(
-                    name = name,
-                    type = "变量",
-                    fullQualifiedName = fullName
-                )
-            }
-
-            else -> null
-        }
-    }
 
     private fun getDefaultResponse(message: String): String {
         return "我收到了你的消息：\"$message\"\n\n" +
