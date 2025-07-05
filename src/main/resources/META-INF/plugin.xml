@@ -17,6 +17,9 @@
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.java</depends>
+
     <!-- Depend on Kotlin plugin to access Kotlin PSI APIs -->
 <!--    <depends>org.jetbrains.kotlin</depends>-->
 

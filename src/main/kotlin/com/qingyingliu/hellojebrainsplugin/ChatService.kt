@@ -31,6 +31,22 @@ import com.intellij.psi.PsiErrorElement
 import com.intellij.util.Processors
 import com.intellij.openapi.vfs.LocalFileSystem
 import java.io.File
+// 新增导入语句用于引用搜索功能
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiField
+import com.intellij.psi.PsiVariable
+import com.intellij.psi.PsiPackage
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.PsiDirectory
+import com.intellij.psi.PsiJavaFile
+import com.intellij.psi.PsiClassOwner
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.PsiModifierListOwner
+import com.intellij.psi.PsiModifier
+import com.intellij.psi.PsiIdentifier
+import com.intellij.psi.PsiNameIdentifierOwner
 
 
 class ChatService(private val project: Project) {
@@ -54,6 +70,8 @@ class ChatService(private val project: Project) {
         println("DEBUG: 包含 'project': ${cleanMessage.contains("project")}")
         println("DEBUG: 包含 'file': ${cleanMessage.contains("file")}")
         println("DEBUG: 包含 'code': ${cleanMessage.contains("code")}")
+        println("DEBUG: 包含 'usages': ${cleanMessage.contains("usages")}")
+        println("DEBUG: 包含 '引用': ${cleanMessage.contains("引用")}")
         
         return when {
             cleanMessage.contains("lint") || cleanMessage.lowercase().contains("lint") || cleanMessage.contains("检查") || cleanMessage.contains("问题") -> {
@@ -115,6 +133,37 @@ class ChatService(private val project: Project) {
                 println("DEBUG: 匹配到 '符号' 或 'symbol'")
                 getOpenSymbols()
             }
+            cleanMessage.contains("usages") || cleanMessage.contains("引用") || cleanMessage.contains("用法") -> {
+                println("DEBUG: 匹配到 usages 相关命令")
+                // 检查是否包含类名参数
+                val classNameMatch = Regex("usages\\s+(.+)|引用\\s+(.+)|用法\\s+(.+)").find(cleanMessage)
+                println("DEBUG: 类名匹配结果: $classNameMatch")
+                if (classNameMatch != null) {
+                    val className = classNameMatch.groupValues.drop(1).firstOrNull { it.isNotEmpty() }
+                    println("DEBUG: 提取的类名: '$className'")
+                    if (className != null) {
+                        getUsagesForClassName(className.trim())
+                    } else {
+                        getUsagesHelp()
+                    }
+                } else {
+                    // 如果没有匹配到类名，尝试更宽松的匹配
+                    println("DEBUG: 尝试更宽松的类名匹配")
+                    val looseMatch = Regex("usages\\s*(.+)|引用\\s*(.+)|用法\\s*(.+)").find(cleanMessage)
+                    println("DEBUG: 宽松匹配结果: $looseMatch")
+                    if (looseMatch != null) {
+                        val className = looseMatch.groupValues.drop(1).firstOrNull { it.isNotEmpty() }
+                        println("DEBUG: 宽松匹配提取的类名: '$className'")
+                        if (className != null) {
+                            getUsagesForClassName(className.trim())
+                        } else {
+                            getUsagesHelp()
+                        }
+                    } else {
+                        getUsagesHelp()
+                    }
+                }
+            }
             else -> {
                 println("DEBUG: 没有匹配到任何条件，使用默认响应")
                 getDefaultResponse(message)
@@ -142,6 +191,7 @@ class ChatService(private val project: Project) {
                 "• '符号' - 查看当前打开文件的符号\n" +
                 "• 'lint' 或 '检查' - 查看当前文件的代码检查问题\n" +
                 "• 'lint 文件路径' - 查看指定文件的代码检查问题\n" +
+                "• 'usages 类名' 或 '引用 类名' - 查找指定类的所有引用\n" +
                 "• 直接询问编程问题\n\n" +
                 "⏰ 其他功能：\n" +
                 "• '时间' - 显示当前时间\n" +
@@ -472,6 +522,297 @@ class ChatService(private val project: Project) {
         for (testCase in testCases) {
             println("\n测试: '$testCase'")
             testLintCommand(testCase)
+        }
+    }
+
+    // ==================== get_usages 相关方法 ====================
+
+    /**
+     * 获取指定类名的所有引用
+     */
+    private fun getUsagesForClassName(className: String): String {
+        println("DEBUG: 开始查找类 '$className' 的引用")
+        
+        val builder = StringBuilder("🔍 查找类 '$className' 的引用：\n\n")
+        
+        try {
+            // 1. 首先尝试查找类定义
+            val psiClass = findClassByName(className)
+            
+            if (psiClass == null) {
+                builder.append("❌ 未找到类 '$className'\n\n")
+                builder.append("💡 提示：\n")
+                builder.append("• 请检查类名是否正确（区分大小写）\n")
+                builder.append("• 如果是内部类，请使用 'OuterClass.InnerClass' 格式\n")
+                builder.append("• 如果是全限定类名，请包含包名\n")
+                builder.append("• 例如：'java.lang.String' 或 'MyClass'\n\n")
+                return builder.toString()
+            }
+            
+            // 2. 显示类的基本信息
+            builder.append("📋 类信息：\n")
+            builder.append("• 类名: ${psiClass.name}\n")
+            builder.append("• 全限定名: ${psiClass.qualifiedName}\n")
+            builder.append("• 包名: ${psiClass.qualifiedName?.substringBeforeLast('.') ?: "未知"}\n")
+            builder.append("• 文件: ${psiClass.containingFile?.name ?: "未知"}\n")
+            builder.append("• 位置: ${psiClass.containingFile?.virtualFile?.path ?: "未知"}\n\n")
+            
+            // 3. 查找所有引用
+            val usages = findUsages(psiClass)
+            
+            if (usages.isEmpty()) {
+                builder.append("✅ 没有找到任何引用\n\n")
+                builder.append("💡 说明：\n")
+                builder.append("• 这个类可能没有被使用\n")
+                builder.append("• 或者引用在注释或字符串中（不会被索引）\n")
+                builder.append("• 或者引用在项目范围之外\n\n")
+            } else {
+                builder.append("📊 找到 ${usages.size} 个引用：\n\n")
+                
+                // 按文件分组显示引用
+                val usagesByFile = usages.groupBy { it.containingFile }
+                
+                usagesByFile.forEach { (file, fileUsages) ->
+                    builder.append("📄 文件: ${file?.name ?: "未知文件"}\n")
+                    builder.append("📍 路径: ${file?.virtualFile?.path ?: "未知路径"}\n")
+                    
+                    fileUsages.forEachIndexed { index, element ->
+                        val line = getElementLineNumber(element)
+                        val column = getElementColumnNumber(element)
+                        val context = getElementContext(element)
+                        
+                        builder.append("  ${index + 1}. 第 ${line} 行，第 ${column} 列\n")
+                        builder.append("     上下文: $context\n")
+                        builder.append("     内容: ${element.text.take(100)}${if (element.text.length > 100) "..." else ""}\n\n")
+                    }
+                }
+            }
+            
+        } catch (e: Exception) {
+            builder.append("❌ 查找过程中发生错误：${e.message}\n\n")
+            builder.append("💡 可能的原因：\n")
+            builder.append("• 项目索引可能不完整\n")
+            builder.append("• 类名格式不正确\n")
+            builder.append("• 项目配置问题\n\n")
+            e.printStackTrace()
+        }
+        
+        return builder.toString()
+    }
+
+    /**
+     * 显示 usages 命令的帮助信息
+     */
+    private fun getUsagesHelp(): String {
+        return "🔍 引用查找命令帮助：\n\n" +
+                "📝 用法：\n" +
+                "• 'usages 类名' - 查找指定类的所有引用\n" +
+                "• '引用 类名' - 查找指定类的所有引用\n" +
+                "• '用法 类名' - 查找指定类的所有引用\n\n" +
+                "💡 示例：\n" +
+                "• 'usages String' - 查找 java.lang.String 的引用\n" +
+                "• '引用 ChatService' - 查找 ChatService 类的引用\n" +
+                "• '用法 java.util.List' - 查找 List 接口的引用\n\n" +
+                "📋 支持的类名格式：\n" +
+                "• 简单类名：'MyClass'\n" +
+                "• 全限定类名：'com.example.MyClass'\n" +
+                "• 内部类：'OuterClass.InnerClass'\n" +
+                "• 标准库类：'String', 'List', 'Map' 等\n\n" +
+                "⚠️ 注意事项：\n" +
+                "• 类名区分大小写\n" +
+                "• 只查找项目范围内的引用\n" +
+                "• 注释和字符串中的引用不会被包含\n"
+    }
+
+    /**
+     * 根据类名查找 PsiClass
+     */
+    private fun findClassByName(className: String): PsiClass? {
+        println("DEBUG: 查找类名: '$className'")
+        
+        val scope = GlobalSearchScope.allScope(project)
+        val javaPsiFacade = JavaPsiFacade.getInstance(project)
+        
+        // 尝试直接查找
+        var psiClass = javaPsiFacade.findClass(className, scope)
+        
+        if (psiClass == null) {
+            // 如果没找到，尝试添加 java.lang 包前缀
+            if (!className.contains(".")) {
+                val javaLangClass = "java.lang.$className"
+                println("DEBUG: 尝试 java.lang 包: '$javaLangClass'")
+                psiClass = javaPsiFacade.findClass(javaLangClass, scope)
+            }
+        }
+        
+        if (psiClass == null) {
+            // 如果还没找到，尝试添加 java.util 包前缀
+            if (!className.contains(".")) {
+                val javaUtilClass = "java.util.$className"
+                println("DEBUG: 尝试 java.util 包: '$javaUtilClass'")
+                psiClass = javaPsiFacade.findClass(javaUtilClass, scope)
+            }
+        }
+        
+        println("DEBUG: 查找结果: ${psiClass?.qualifiedName ?: "未找到"}")
+        return psiClass
+    }
+
+    /**
+     * 查找指定 PSI 元素的所有引用
+     */
+    private fun findUsages(element: PsiElement): List<PsiElement> {
+        println("DEBUG: 查找元素 '${element.text}' 的引用")
+        
+        val usages = mutableListOf<PsiElement>()
+        val targetName = when (element) {
+            is PsiClass -> element.name
+            is PsiMethod -> element.name
+            is PsiField -> element.name
+            is PsiVariable -> element.name
+            else -> element.text
+        }
+        
+        if (targetName == null) {
+            println("DEBUG: 目标元素名称为空")
+            return emptyList()
+        }
+        
+        try {
+            // 遍历项目中的所有文件来查找引用
+            val scope = GlobalSearchScope.allScope(project)
+            val psiManager = PsiManager.getInstance(project)
+            
+            // 获取项目根目录
+            val rootDir = project.baseDir
+            collectUsagesFromDirectory(rootDir, targetName, usages, psiManager)
+            
+            println("DEBUG: 找到 ${usages.size} 个引用")
+            return usages
+        } catch (e: Exception) {
+            println("DEBUG: 查找引用时发生错误: ${e.message}")
+            e.printStackTrace()
+            return emptyList()
+        }
+    }
+    
+    /**
+     * 递归遍历目录查找引用
+     */
+    private fun collectUsagesFromDirectory(directory: VirtualFile, targetName: String, usages: MutableList<PsiElement>, psiManager: PsiManager) {
+        for (child in directory.children) {
+            if (child.isDirectory) {
+                collectUsagesFromDirectory(child, targetName, usages, psiManager)
+            } else if (child.extension in listOf("java", "kt", "groovy")) {
+                val psiFile = psiManager.findFile(child)
+                if (psiFile != null) {
+                    collectUsagesFromFile(psiFile, targetName, usages)
+                }
+            }
+        }
+    }
+    
+    /**
+     * 从单个文件中查找引用
+     */
+    private fun collectUsagesFromFile(psiFile: PsiFile, targetName: String, usages: MutableList<PsiElement>) {
+        psiFile.accept(object : PsiRecursiveElementWalkingVisitor() {
+            override fun visitElement(element: PsiElement) {
+                // 检查元素是否是标识符且名称匹配
+                if (element is PsiIdentifier && element.text == targetName) {
+                    // 确保这不是定义本身
+                    val parent = element.parent
+                    if (parent is PsiNameIdentifierOwner && parent.nameIdentifier == element) {
+                        // 这是定义，不是引用，跳过
+                        return
+                    }
+                    usages.add(element)
+                }
+                super.visitElement(element)
+            }
+        })
+    }
+
+    /**
+     * 获取元素的行号
+     */
+    private fun getElementLineNumber(element: PsiElement): Int {
+        return try {
+            val document = element.containingFile?.viewProvider?.document
+            if (document != null) {
+                document.getLineNumber(element.textRange.startOffset) + 1
+            } else {
+                0
+            }
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    /**
+     * 获取元素的列号
+     */
+    private fun getElementColumnNumber(element: PsiElement): Int {
+        return try {
+            val document = element.containingFile?.viewProvider?.document
+            if (document != null) {
+                val lineStart = document.getLineStartOffset(document.getLineNumber(element.textRange.startOffset))
+                element.textRange.startOffset - lineStart + 1
+            } else {
+                0
+            }
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    /**
+     * 获取元素的上下文信息
+     */
+    private fun getElementContext(element: PsiElement): String {
+        return try {
+            val parent = element.parent
+            return when {
+                parent is PsiClass -> "类定义中"
+                parent is PsiMethod -> "方法 '${parent.name}' 中"
+                parent is PsiField -> "字段 '${parent.name}' 中"
+                parent is PsiVariable -> "变量 '${parent.name}' 中"
+                parent is PsiPackage -> "包 '${parent.name}' 中"
+                else -> "代码中"
+            }
+        } catch (e: Exception) {
+            "代码中"
+        }
+    }
+
+    // 测试方法，用于验证 usages 命令匹配
+    fun testUsagesCommand(message: String): String {
+        println("=== 测试 usages 命令匹配 ===")
+        println("输入消息: '$message'")
+        
+        val result = processMessage(message)
+        
+        println("=== 测试结果 ===")
+        println("输出: $result")
+        println("==================")
+        
+        return result
+    }
+    
+    // 简单的测试方法，用于快速验证 usages 命令
+    fun quickTestUsages() {
+        val testCases = listOf(
+            "usages String",
+            "引用 ChatService",
+            "用法 java.util.List",
+            "usages",
+            "引用"
+        )
+        
+        println("=== 快速测试 usages 命令 ===")
+        for (testCase in testCases) {
+            println("\n测试: '$testCase'")
+            testUsagesCommand(testCase)
         }
     }
 } 
