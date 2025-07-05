@@ -6,6 +6,10 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiNamedElement
+import com.intellij.psi.PsiRecursiveElementWalkingVisitor
 
 class ChatService(private val project: Project) {
     
@@ -17,6 +21,7 @@ class ChatService(private val project: Project) {
             message.contains("项目") || message.contains("project") -> getProjectInfo()
             message.contains("文件") || message.contains("file") -> getFileInfo()
             message.contains("代码") || message.contains("code") -> getCodeHelp()
+            message.contains("符号") || message.contains("symbol") -> getOpenSymbols()
             else -> getDefaultResponse(message)
         }
     }
@@ -38,6 +43,7 @@ class ChatService(private val project: Project) {
                "• '文件' - 查看项目文件结构\n\n" +
                "💻 编程相关：\n" +
                "• '代码' - 获取编程帮助\n" +
+               "• '符号' - 查看当前打开文件的符号\n" +
                "• 直接询问编程问题\n\n" +
                "⏰ 其他功能：\n" +
                "• '时间' - 显示当前时间\n" +
@@ -88,6 +94,49 @@ class ChatService(private val project: Project) {
                "• '如何创建一个新的工具窗口？'\n" +
                "• 'Kotlin 中的扩展函数是什么？'\n" +
                "• '如何注册一个动作？'"
+    }
+    
+    private fun getOpenSymbols(): String {
+        val editorManager = FileEditorManager.getInstance(project)
+        val openFiles = editorManager.selectedFiles
+
+        if (openFiles.isEmpty()) {
+            return "当前没有打开任何文件。"
+        }
+
+        val psiManager = PsiManager.getInstance(project)
+        val builder = StringBuilder("🔖 当前打开文件中的符号：\n\n")
+
+        for (virtualFile in openFiles) {
+            val psiFile = psiManager.findFile(virtualFile) ?: continue
+
+            val symbols = mutableListOf<String>()
+
+            psiFile.accept(object : PsiRecursiveElementWalkingVisitor() {
+                override fun visitElement(element: PsiElement) {
+                    if (element is PsiNamedElement) {
+                        val name = element.name
+                        if (!name.isNullOrBlank()) {
+                            symbols.add(name)
+                        }
+                    }
+                    super.visitElement(element)
+                }
+            })
+
+            builder.append("文件: ").append(virtualFile.name).append("\n")
+
+            if (symbols.isEmpty()) {
+                builder.append("  (无符号)\n\n")
+            } else {
+                symbols.distinct().forEach { sym ->
+                    builder.append("  • ").append(sym).append("\n")
+                }
+                builder.append("\n")
+            }
+        }
+
+        return builder.toString()
     }
     
     private fun getDefaultResponse(message: String): String {
