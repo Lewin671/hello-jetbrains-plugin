@@ -36,29 +36,89 @@ import java.io.File
 class ChatService(private val project: Project) {
 
     fun processMessage(message: String): String {
+        // 清理消息，去除不可见字符和换行符
+        val cleanMessage = message.trim().replace(Regex("[\\r\\n\\t]+"), " ")
+        println("DEBUG: 原始消息: '$message'")
+        println("DEBUG: 清理后消息: '$cleanMessage'")
+        println("DEBUG: 消息长度: ${cleanMessage.length}")
+        println("DEBUG: 包含 'lint': ${cleanMessage.contains("lint")}")
+        println("DEBUG: 包含 '检查': ${cleanMessage.contains("检查")}")
+        println("DEBUG: 包含 '问题': ${cleanMessage.contains("问题")}")
+        println("DEBUG: 消息转小写: '${cleanMessage.lowercase()}'")
+        println("DEBUG: 转小写后包含 'lint': ${cleanMessage.lowercase().contains("lint")}")
+        println("DEBUG: 消息是否以 'lint' 开头: ${cleanMessage.startsWith("lint")}")
+        println("DEBUG: 消息是否以 'lint' 开头（忽略大小写）: ${cleanMessage.lowercase().startsWith("lint")}")
+        
+        // 检查其他可能的匹配
+        println("DEBUG: 包含 'java': ${cleanMessage.contains("java")}")
+        println("DEBUG: 包含 'project': ${cleanMessage.contains("project")}")
+        println("DEBUG: 包含 'file': ${cleanMessage.contains("file")}")
+        println("DEBUG: 包含 'code': ${cleanMessage.contains("code")}")
+        
         return when {
-            message.contains("你好") || message.contains("hello") -> getGreeting()
-            message.contains("帮助") || message.contains("help") -> getHelpMessage()
-            message.contains("时间") || message.contains("time") -> getCurrentTime()
-            message.contains("项目") || message.contains("project") -> getProjectInfo()
-            message.contains("文件") || message.contains("file") -> getFileInfo()
-            message.contains("代码") || message.contains("code") -> getCodeHelp()
-            message.contains("符号") || message.contains("symbol") -> getOpenSymbols()
-            message.contains("lint") || message.contains("检查") || message.contains("问题") -> {
+            cleanMessage.contains("lint") || cleanMessage.lowercase().contains("lint") || cleanMessage.contains("检查") || cleanMessage.contains("问题") -> {
+                println("DEBUG: 匹配到 lint 相关命令")
                 // 检查是否包含路径信息
-                val pathMatch = Regex("lint\\s+(.+)|检查\\s+(.+)|问题\\s+(.+)").find(message)
+                val pathMatch = Regex("lint\\s+(.+)|检查\\s+(.+)|问题\\s+(.+)").find(cleanMessage)
+                println("DEBUG: 路径匹配结果: $pathMatch")
                 if (pathMatch != null) {
                     val path = pathMatch.groupValues.drop(1).firstOrNull { it.isNotEmpty() }
+                    println("DEBUG: 提取的路径: '$path'")
                     if (path != null) {
                         getLintInfoForPath(path.trim())
                     } else {
                         getLintInfo()
                     }
                 } else {
-                    getLintInfo()
+                    // 如果没有匹配到路径，尝试更宽松的匹配
+                    println("DEBUG: 尝试更宽松的路径匹配")
+                    val looseMatch = Regex("lint\\s*(.+)|检查\\s*(.+)|问题\\s*(.+)").find(cleanMessage)
+                    println("DEBUG: 宽松匹配结果: $looseMatch")
+                    if (looseMatch != null) {
+                        val path = looseMatch.groupValues.drop(1).firstOrNull { it.isNotEmpty() }
+                        println("DEBUG: 宽松匹配提取的路径: '$path'")
+                        if (path != null) {
+                            getLintInfoForPath(path.trim())
+                        } else {
+                            getLintInfo()
+                        }
+                    } else {
+                        getLintInfo()
+                    }
                 }
             }
-            else -> getDefaultResponse(message)
+            cleanMessage.contains("你好") || cleanMessage.contains("hello") -> {
+                println("DEBUG: 匹配到 '你好' 或 'hello'")
+                getGreeting()
+            }
+            cleanMessage.contains("帮助") || cleanMessage.contains("help") -> {
+                println("DEBUG: 匹配到 '帮助' 或 'help'")
+                getHelpMessage()
+            }
+            cleanMessage.contains("时间") || cleanMessage.contains("time") -> {
+                println("DEBUG: 匹配到 '时间' 或 'time'")
+                getCurrentTime()
+            }
+            cleanMessage.contains("项目") || cleanMessage.contains("project") -> {
+                println("DEBUG: 匹配到 '项目' 或 'project'")
+                getProjectInfo()
+            }
+            cleanMessage.contains("文件") || cleanMessage.contains("file") -> {
+                println("DEBUG: 匹配到 '文件' 或 'file'")
+                getFileInfo()
+            }
+            cleanMessage.contains("代码") || cleanMessage.contains("code") -> {
+                println("DEBUG: 匹配到 '代码' 或 'code'")
+                getCodeHelp()
+            }
+            cleanMessage.contains("符号") || cleanMessage.contains("symbol") -> {
+                println("DEBUG: 匹配到 '符号' 或 'symbol'")
+                getOpenSymbols()
+            }
+            else -> {
+                println("DEBUG: 没有匹配到任何条件，使用默认响应")
+                getDefaultResponse(message)
+            }
         }
     }
 
@@ -382,6 +442,36 @@ class ChatService(private val project: Project) {
             project.baseDir.children.size
         } catch (e: Exception) {
             0
+        }
+    }
+
+    // 测试方法，用于验证 lint 命令匹配
+    fun testLintCommand(message: String): String {
+        println("=== 测试 lint 命令匹配 ===")
+        println("输入消息: '$message'")
+        
+        val result = processMessage(message)
+        
+        println("=== 测试结果 ===")
+        println("输出: $result")
+        println("==================")
+        
+        return result
+    }
+    
+    // 简单的测试方法，用于快速验证
+    fun quickTest() {
+        val testCases = listOf(
+            "lint /Users/qingyingliu/IdeaProjects/hello-java/src/Test.kt",
+            "lint Test.kt",
+            "检查 /path/to/file.kt",
+            "问题 src/main/kotlin/MyFile.kt"
+        )
+        
+        println("=== 快速测试 lint 命令 ===")
+        for (testCase in testCases) {
+            println("\n测试: '$testCase'")
+            testLintCommand(testCase)
         }
     }
 } 
