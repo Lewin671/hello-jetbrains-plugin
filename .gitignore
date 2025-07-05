@@ -17,6 +17,8 @@ out/
 !**/src/test/**/out/
 .intellijPlatform/
 
+.kotlin/
+
 ### Eclipse ###
 .apt_generated
 .classpath
