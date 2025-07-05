@@ -1,5 +1,8 @@
 package com.qingyingliu.hellojebrainsplugin
 
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
+import com.intellij.codeInsight.multiverse.codeInsightContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
@@ -10,6 +13,22 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.PsiRecursiveElementWalkingVisitor
+import com.intellij.codeInspection.InspectionManager
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.ProblemDescriptor
+import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.editor.markup.RangeHighlighter
+import com.intellij.openapi.editor.markup.HighlighterLayer
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.colors.EditorColors
+import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.editor.markup.TextAttributes
+import java.awt.Color
+import com.intellij.psi.PsiErrorElement
+import com.intellij.util.Processors
 
 
 class ChatService(private val project: Project) {
@@ -23,6 +42,7 @@ class ChatService(private val project: Project) {
             message.contains("文件") || message.contains("file") -> getFileInfo()
             message.contains("代码") || message.contains("code") -> getCodeHelp()
             message.contains("符号") || message.contains("symbol") -> getOpenSymbols()
+            message.contains("lint") || message.contains("检查") || message.contains("问题") -> getLintInfo()
             else -> getDefaultResponse(message)
         }
     }
@@ -45,6 +65,7 @@ class ChatService(private val project: Project) {
                 "💻 编程相关：\n" +
                 "• '代码' - 获取编程帮助\n" +
                 "• '符号' - 查看当前打开文件的符号\n" +
+                "• 'lint' 或 '检查' - 查看当前文件的代码检查问题\n" +
                 "• 直接询问编程问题\n\n" +
                 "⏰ 其他功能：\n" +
                 "• '时间' - 显示当前时间\n" +
@@ -156,6 +177,140 @@ class ChatService(private val project: Project) {
         val fullQualifiedName: String
     )
 
+    private fun getLintInfo(): String {
+        val editorManager = FileEditorManager.getInstance(project)
+        val openFiles = editorManager.selectedFiles
+
+        if (openFiles.isEmpty()) {
+            return "当前没有打开任何文件。请先打开一个文件，然后使用 'lint' 命令查看代码检查问题。"
+        }
+
+        val builder = StringBuilder("🔍 代码检查问题：\n\n")
+
+        for (virtualFile in openFiles) {
+            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: continue
+            val editor = editorManager.getSelectedTextEditor()
+
+            if (editor == null) {
+                builder.append("文件: ${virtualFile.name}\n")
+                builder.append("  (无法获取编辑器信息)\n\n")
+                continue
+            }
+
+            builder.append("📄 文件: ${virtualFile.name}\n")
+
+            // 获取文档中的高亮信息（包括错误、警告等）
+            val document = editor.document
+            val highlights = mutableListOf<HighlightInfo>()
+
+            // 获取错误级别的问题
+            DaemonCodeAnalyzerEx.processHighlights(
+                document,
+                project,
+                HighlightSeverity.ERROR,
+                editor.document.getLineStartOffset(0),
+                editor.document.getLineEndOffset(editor.document.lineCount - 1),
+                Processors.cancelableCollectProcessor(highlights)
+            )
+
+            // 获取警告级别的问题
+            val warnings = mutableListOf<HighlightInfo>()
+            DaemonCodeAnalyzerEx.processHighlights(
+                document,
+                project,
+                HighlightSeverity.WARNING,
+                editor.document.getLineStartOffset(0),
+                editor.document.getLineEndOffset(editor.document.lineCount - 1),
+                Processors.cancelableCollectProcessor(warnings)
+            )
+
+            // 获取弱警告级别的问题
+            val weakWarnings = mutableListOf<HighlightInfo>()
+            DaemonCodeAnalyzerEx.processHighlights(
+                document,
+                project,
+                HighlightSeverity.WEAK_WARNING,
+                editor.document.getLineStartOffset(0),
+                editor.document.getLineEndOffset(editor.document.lineCount - 1),
+                Processors.cancelableCollectProcessor(weakWarnings)
+            )
+
+            val totalProblems = highlights.size + warnings.size + weakWarnings.size
+
+            if (totalProblems == 0) {
+                builder.append("  ✅ 没有发现代码问题\n\n")
+            } else {
+                builder.append("  📊 总计发现 $totalProblems 个问题：\n")
+                builder.append("    • 错误: ${highlights.size} 个\n")
+                builder.append("    • 警告: ${warnings.size} 个\n")
+                builder.append("    • 弱警告: ${weakWarnings.size} 个\n\n")
+
+                // 显示错误详情
+                if (highlights.isNotEmpty()) {
+                    builder.append("  ❌ 错误详情：\n")
+                    highlights.forEachIndexed { index, highlight ->
+                        val line = document.getLineNumber(highlight.startOffset) + 1
+                        val column = highlight.startOffset - document.getLineStartOffset(line - 1) + 1
+                        val description = highlight.description ?: "未知错误"
+                        val tooltip = highlight.toolTip ?: description
+                        
+                        builder.append("    ${index + 1}. 第 ${line} 行，第 ${column} 列\n")
+                        builder.append("       描述: $description\n")
+                        if (tooltip != description) {
+                            builder.append("       详情: $tooltip\n")
+                        }
+                        builder.append("\n")
+                    }
+                }
+
+//                // 显示警告详情
+//                if (warnings.isNotEmpty()) {
+//                    builder.append("  ⚠️ 警告详情：\n")
+//                    warnings.forEachIndexed { index, warning ->
+//                        val line = document.getLineNumber(warning.startOffset) + 1
+//                        val column = warning.startOffset - document.getLineStartOffset(line - 1) + 1
+//                        val description = warning.description ?: "未知警告"
+//                        val tooltip = warning.toolTip ?: description
+//
+//                        builder.append("    ${index + 1}. 第 ${line} 行，第 ${column} 列\n")
+//                        builder.append("       描述: $description\n")
+//                        if (tooltip != description) {
+//                            builder.append("       详情: $tooltip\n")
+//                        }
+//                        builder.append("\n")
+//                    }
+//                }
+//
+//                // 显示弱警告详情
+//                if (weakWarnings.isNotEmpty()) {
+//                    builder.append("  💡 弱警告详情：\n")
+//                    weakWarnings.forEachIndexed { index, weakWarning ->
+//                        val line = document.getLineNumber(weakWarning.startOffset) + 1
+//                        val column = weakWarning.startOffset - document.getLineStartOffset(line - 1) + 1
+//                        val description = weakWarning.description ?: "未知弱警告"
+//                        val tooltip = weakWarning.toolTip ?: description
+//
+//                        builder.append("    ${index + 1}. 第 ${line} 行，第 ${column} 列\n")
+//                        builder.append("       描述: $description\n")
+//                        if (tooltip != description) {
+//                            builder.append("       详情: $tooltip\n")
+//                        }
+//                        builder.append("\n")
+//                    }
+//                }
+            }
+        }
+
+        return builder.toString()
+    }
+
+    private data class ProblemInfo(
+        val type: String,
+        val line: Int,
+        val column: Int,
+        val text: String,
+        val description: String
+    )
 
     private fun getDefaultResponse(message: String): String {
         return "我收到了你的消息：\"$message\"\n\n" +
