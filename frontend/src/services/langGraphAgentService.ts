@@ -4,58 +4,54 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { ENV_CONFIG, validateConfig } from "../config/env";
 
-// 定义工具函数
-const search = tool(
+// 定义工具函数 - 使用更清晰的描述和参数
+const searchTool = tool(
   async (input: { query: string }) => {
-    const { query } = input;
-    console.log('Search tool called with query:', query);
+    console.log('🔍 Search tool called with query:', input.query);
     
     // 模拟搜索功能
-    if (query.toLowerCase().includes("天气") || query.toLowerCase().includes("weather")) {
+    if (input.query.toLowerCase().includes("天气") || input.query.toLowerCase().includes("weather")) {
       return "今天天气晴朗，温度25度，适合外出活动。";
     }
-    if (query.toLowerCase().includes("时间") || query.toLowerCase().includes("time")) {
+    if (input.query.toLowerCase().includes("时间") || input.query.toLowerCase().includes("time")) {
       return `当前时间是 ${new Date().toLocaleString('zh-CN')}`;
     }
-    if (query.toLowerCase().includes("计算") || query.toLowerCase().includes("calculate")) {
-      // 简单的数学计算
-      try {
-        const result = eval(query.replace(/[^0-9+\-*/().]/g, ''));
-        return `计算结果: ${result}`;
-      } catch (error) {
-        return "无法计算该表达式";
-      }
+    if (input.query.toLowerCase().includes("新闻") || input.query.toLowerCase().includes("news")) {
+      return "今日新闻：科技发展迅速，AI技术不断创新。";
     }
-    return `关于"${query}"的信息：这是一个模拟的搜索结果。在实际应用中，这里会调用真实的搜索API。`;
+    return `关于"${input.query}"的信息：这是一个模拟的搜索结果。在实际应用中，这里会调用真实的搜索API。`;
   },
   {
     name: "search",
-    description: "搜索信息或进行计算",
+    description: "搜索信息，包括天气、时间、新闻等。当用户询问天气、时间或需要搜索信息时使用此工具。",
     schema: z.object({
-      query: z.string().describe("要搜索的查询内容或要计算的表达式"),
+      query: z.string().describe("要搜索的查询内容"),
     }) as any,
   }
 );
 
-const calculator = tool(
+const calculatorTool = tool(
   async (input: { expression: string }) => {
-    const { expression } = input;
-    console.log('Calculator tool called with expression:', expression);
+    console.log('🧮 Calculator tool called with expression:', input.expression);
     
     try {
       // 安全地计算数学表达式
-      const sanitizedExpression = expression.replace(/[^0-9+\-*/().]/g, '');
-      const result = eval(sanitizedExpression);
+      const sanitizedExpression = input.expression.replace(/[^0-9+\-*/().]/g, '');
+      
+      // 使用 Function 构造函数替代 eval，更安全
+      // eslint-disable-next-line no-new-func
+      const result = new Function(`return ${sanitizedExpression}`)();
+      
       return `计算结果: ${result}`;
     } catch (error) {
-      return "计算错误，请检查表达式";
+      return "计算错误，请检查表达式格式是否正确。";
     }
   },
   {
     name: "calculator",
-    description: "执行数学计算",
+    description: "执行数学计算。当用户需要进行数学运算时使用此工具。",
     schema: z.object({
-      expression: z.string().describe("要计算的数学表达式"),
+      expression: z.string().describe("要计算的数学表达式，如：2+3*4"),
     }) as any,
   }
 );
@@ -83,62 +79,26 @@ export class LangGraphAgentService {
         temperature: ENV_CONFIG.OLLAMA_CONFIG.temperature,
       });
 
-      console.log('Creating ReAct agent with model:', ENV_CONFIG.OLLAMA_CONFIG.model);
+      console.log('🤖 Creating ReAct agent with model:', ENV_CONFIG.OLLAMA_CONFIG.model);
 
       // 创建ReAct agent
       this.agent = createReactAgent({
         llm: model,
-        tools: [search, calculator],
+        tools: [searchTool, calculatorTool],
       });
 
+      console.log('✅ Agent created successfully');
+      console.log('🔧 Agent type:', typeof this.agent);
+      console.log('🔧 Agent keys:', Object.keys(this.agent));
+      console.log('🔧 Agent invoke method:', typeof this.agent.invoke);
+      console.log('🔧 Agent stream method:', typeof this.agent.stream);
+      // tools 
+      console.log('🔧 Agent tools:', this.agent);
       this.isInitialized = true;
-      console.log("LangGraph Agent initialized successfully with Ollama model");
+      console.log("✅ LangGraph Agent initialized successfully with Ollama model");
     } catch (error) {
-      console.error("Failed to initialize LangGraph Agent:", error);
+      console.error("❌ Failed to initialize LangGraph Agent:", error);
       throw error;
-    }
-  }
-
-  static async sendMessage(message: string): Promise<string> {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
-    try {
-      console.log('Sending message to agent:', message);
-      const result = await this.agent.invoke({
-        messages: [{
-          role: "user",
-          content: message
-        }]
-      });
-
-      console.log('Agent result:', result);
-
-      // 提取最后一条消息作为回复
-      if (result.messages && result.messages.length > 0) {
-        const lastMessage = result.messages[result.messages.length - 1];
-        console.log('Last message from agent:', lastMessage);
-        
-        if (lastMessage.content && lastMessage.content.trim() !== '') {
-          return lastMessage.content;
-        } else {
-          console.warn('Last message has no content, checking for tool results');
-          // 如果没有内容，可能是工具调用的结果
-          // 尝试从其他消息中获取内容
-          for (let i = result.messages.length - 1; i >= 0; i--) {
-            const msg = result.messages[i];
-            if (msg.content && msg.content.trim() !== '') {
-              return msg.content;
-            }
-          }
-        }
-      }
-      
-      return "抱歉，我没有收到有效的回复。";
-    } catch (error) {
-      console.error("Error in LangGraph Agent:", error);
-      return "抱歉，我遇到了一些问题，请稍后再试。";
     }
   }
 
@@ -154,72 +114,51 @@ export class LangGraphAgentService {
       await this.initialize();
     }
 
-    // 如果不启用流式响应，使用普通模式
-    if (!ENV_CONFIG.ENABLE_STREAMING) {
-      console.log('Streaming disabled, using regular mode');
-      const response = await this.sendMessage(message);
-      onChunk(response);
-      onComplete(response);
-      return;
-    }
-
     try {
       console.log('Starting streaming with agent...');
       
-      // 使用Ollama的直接流式API
-      const response = await fetch(`${ENV_CONFIG.OLLAMA_CONFIG.baseUrl}/api/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: ENV_CONFIG.OLLAMA_CONFIG.model,
-          prompt: message,
-          stream: true,
-          options: {
-            temperature: ENV_CONFIG.OLLAMA_CONFIG.temperature,
+      // 使用 LangGraph Agent 的流式功能
+      const stream = await this.agent.stream({
+        messages: [
+          {
+            role: "system",
+            content: `你是一个有用的AI助手。当用户询问以下内容时，请使用相应的工具：
+1. 询问天气、时间、新闻等信息时，使用search工具
+2. 需要进行数学计算时，使用calculator工具
+3. 其他问题直接回答
+
+可用工具：
+- search: 搜索信息，包括天气、时间、新闻等
+- calculator: 执行数学计算
+
+请根据用户的问题选择合适的工具，或者直接回答。`
+          },
+          {
+            role: "user",
+            content: message
           }
-        }),
+        ]
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No reader available');
-      }
-
       let finalMessage = "";
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
+      let chunkCount = 0;
+      
+      for await (const chunk of stream) {
+        chunkCount++;
+        console.log(`流式 chunk ${chunkCount}:`, chunk);
         
-        if (done) {
-          break;
-        }
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            
-            if (data.response) {
-              finalMessage += data.response;
-              console.log('Streaming chunk:', data.response);
-              onChunk(data.response);
+        if (chunk.agent && chunk.agent.messages) {
+          const messages = Array.isArray(chunk.agent.messages) ? chunk.agent.messages : [chunk.agent.messages];
+          if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            if (typeof lastMessage === 'object' && lastMessage && 'content' in lastMessage && lastMessage.content) {
+              const content = String(lastMessage.content);
+              if (content.trim() !== '') {
+                finalMessage = content;
+                console.log('当前消息内容:', finalMessage);
+                onChunk(finalMessage);
+              }
             }
-            
-            if (data.done) {
-              console.log('Stream completed');
-              break;
-            }
-          } catch (e) {
-            console.warn('Failed to parse JSON line:', line);
           }
         }
       }
@@ -228,18 +167,39 @@ export class LangGraphAgentService {
       onComplete(finalMessage);
     } catch (error) {
       console.error("Error in LangGraph Agent streaming:", error);
-      
-      // 如果流式失败，回退到普通模式
+      const errorMessage = "抱歉，我遇到了一些问题，请稍后再试。";
+      onChunk(errorMessage);
+      onComplete(errorMessage);
+    }
+  }
+
+  // 测试函数 - 验证tools是否正常工作
+  static async testTools(): Promise<void> {
+    console.log('🧪 Testing tools functionality...');
+    
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+
+    const testCases = [
+      "今天天气怎么样？",
+      "现在几点了？",
+      "请计算 2 + 3 * 4",
+      "有什么新闻吗？"
+    ];
+
+    for (const testCase of testCases) {
+      console.log(`\n🔍 Testing: "${testCase}"`);
       try {
-        console.log('Falling back to regular mode...');
-        const response = await this.sendMessage(message);
-        onChunk(response);
-        onComplete(response);
-      } catch (fallbackError) {
-        console.error("Fallback also failed:", fallbackError);
-        const errorMessage = "抱歉，我遇到了一些问题，请稍后再试。";
-        onChunk(errorMessage);
-        onComplete(errorMessage);
+        let response = "";
+        await this.sendMessageWithStreaming(
+          testCase,
+          (chunk) => { response = chunk; },
+          (final) => { response = final; }
+        );
+        console.log(`✅ Response: ${response}`);
+      } catch (error) {
+        console.error(`❌ Error for "${testCase}":`, error);
       }
     }
   }

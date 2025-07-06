@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Message, ChatState } from '../types/chat';
+import { ChatState } from '../types/chat';
 import { CHAT_CONSTANTS } from '../constants/chat';
 import { createMessage } from '../utils/chatUtils';
 import { ChatService } from '../services/chatService';

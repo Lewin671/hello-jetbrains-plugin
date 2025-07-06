@@ -8,6 +8,8 @@ import { TypingIndicator } from './components/TypingIndicator';
 import { CHAT_CONSTANTS } from './constants/chat';
 import { isValidMessage, focusInput } from './utils/chatUtils';
 import { testOllamaAndAgent, testStreamingAgent, testOllamaStreaming } from './services/ollamaTest';
+import { LangGraphAgentService } from './services/langGraphAgentService';
+import './testTools'; // 导入测试脚本
 
 function App() {
   const {
@@ -45,6 +47,11 @@ function App() {
     console.log('开始 Ollama 流式测试...');
     const result = await testOllamaStreaming();
     console.log('Ollama 流式测试结果:', result);
+  };
+
+  const handleTestTools = async () => {
+    console.log('开始测试 Tools...');
+    await LangGraphAgentService.testTools();
   };
 
   return (
@@ -95,6 +102,21 @@ function App() {
           }}
         >
           测试Ollama流式
+        </button>
+        <button 
+          onClick={handleTestTools}
+          style={{
+            marginLeft: '5px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            backgroundColor: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          测试Tools
         </button>
       </div>
       

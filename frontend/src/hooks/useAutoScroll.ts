@@ -7,6 +7,7 @@ export const useAutoScroll = (dependencies: any[]) => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     scrollToBottom();
   }, dependencies);

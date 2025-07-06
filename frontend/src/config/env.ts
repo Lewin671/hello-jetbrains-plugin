@@ -4,7 +4,7 @@ export const ENV_CONFIG = {
   OLLAMA_CONFIG: {
     baseUrl: process.env.REACT_APP_OLLAMA_BASE_URL || 'http://localhost:11434',
     model: "granite3.3:8b",
-    temperature: 0.7,
+    temperature: 0.6,
   },
   
   // 是否启用流式响应
