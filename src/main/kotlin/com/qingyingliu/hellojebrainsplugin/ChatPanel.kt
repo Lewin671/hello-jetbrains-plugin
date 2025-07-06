@@ -8,218 +8,249 @@ import java.awt.BorderLayout
 import javax.swing.*
 
 class ChatPanel(private val project: Project) : JPanel(BorderLayout()) {
-    
+
     private val chatService = ChatService(project)
     private val browser = JBCefBrowser()
     private val jsQuery = JBCefJSQuery.create(browser)
-    
+
     init {
         setupUI()
         setupJavaScriptBridge()
         loadChatInterface()
     }
-    
+
     private fun setupUI() {
         browser.component.preferredSize = java.awt.Dimension(400, 500)
-        
         add(browser.component, BorderLayout.CENTER)
         border = JBUI.Borders.empty(5)
     }
-    
+
     private fun setupJavaScriptBridge() {
-        // 处理从JavaScript发送的消息
+        // 注册 Java 端的 handler
         jsQuery.addHandler { message ->
-            try {
+            return@addHandler try {
                 val response = chatService.processMessage(message)
-                sendResponseToJavaScript(response)
-                null
+                JBCefJSQuery.Response(response)
             } catch (e: Exception) {
                 e.printStackTrace()
-                sendResponseToJavaScript("抱歉，处理消息时出现错误: ${e.message}")
-                null
+                JBCefJSQuery.Response("抱歉，处理消息时出现错误: ${e.message}")
             }
         }
-        
-        // 注入jsQuery到window（可选，实际通信用jsQuery.invoke）
+
+        // 在页面里注入 sendMessage 函数，支持带回调
         browser.cefBrowser.executeJavaScript(
-            "window.Java = { jsQuery: {} };", browser.cefBrowser.url, 0
+            """
+            window.sendMessage = function(message, onSuccess, onFailure) {
+                ${jsQuery.inject("message", "onSuccess", "onFailure")}
+            };
+            """.trimIndent(),
+            browser.cefBrowser.url, 0
         )
     }
-    
+
     private fun loadChatInterface() {
         val htmlContent = """
             <!DOCTYPE html>
             <html lang="zh-CN">
             <head>
                 <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>AI助手</title>
                 <style>
-                    * {
+                    /* --- 全局和主题变量 --- */
+                    :root {
+                        /* 默认值 (亮色主题) */
+                        --bg-color: var(--jb-background-color, #ffffff);
+                        --text-color: var(--jb-text-color, #222222);
+                        --border-color: var(--jb-border-color, #d0d0d0);
+                        --input-bg-color: var(--jb-editor-background-color, #ffffff);
+                        --button-bg-color: var(--jb-button-background-color, #f0f0f0);
+                        --button-text-color: var(--jb-button-foreground-color, #222222);
+                        --button-hover-bg-color: var(--jb-button-hover-background-color, #e0e0e0);
+                        --accent-color: var(--jb-link-color, #0d6efd);
+                        --user-message-bg: #e7f1ff;
+                        --assistant-message-bg: var(--jb-content-background-color, #f2f2f2);
+
+                        /* 暗色主题下的颜色覆盖 */
+                        --user-message-bg-dark: #3b5980;
+                        --assistant-message-bg-dark: #3c3f41;
+                    }
+                    
+                    /* 适配 IntelliJ 暗色主题 */
+                    html[class*="Theme--Darcula"] {
+                         --user-message-bg: var(--user-message-bg-dark);
+                         --assistant-message-bg: var(--assistant-message-bg-dark);
+                    }
+
+                    /* --- 基础样式 --- */
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                        font-size: 14px;
                         margin: 0;
-                        padding: 0;
+                        background-color: var(--bg-color);
+                        color: var(--text-color);
+                        overflow: hidden; /* 防止body滚动，让容器滚动 */
+                    }
+
+                    * {
                         box-sizing: border-box;
                     }
-                    
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        background-color: #f5f5f5;
-                        height: 100vh;
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    
+
+                    /* --- 布局容器 --- */
                     .chat-container {
-                        flex: 1;
                         display: flex;
                         flex-direction: column;
-                        background: white;
-                        border-radius: 8px;
-                        margin: 8px;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                        overflow: hidden;
+                        height: 100vh;
+                        padding: 10px;
                     }
-                    
+
                     .chat-header {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 16px;
-                        text-align: center;
-                        font-weight: 600;
                         font-size: 16px;
-                    }
-                    
-                    .chat-messages {
-                        flex: 1;
-                        padding: 16px;
-                        overflow-y: auto;
-                        max-height: 400px;
-                    }
-                    
-                    .message {
-                        margin-bottom: 16px;
-                        display: flex;
-                        align-items: flex-start;
-                    }
-                    
-                    .message.user {
-                        justify-content: flex-end;
-                    }
-                    
-                    .message.assistant {
-                        justify-content: flex-start;
-                    }
-                    
-                    .message-content {
-                        max-width: 70%;
-                        padding: 12px 16px;
-                        border-radius: 18px;
-                        word-wrap: break-word;
-                        line-height: 1.4;
-                    }
-                    
-                    .message.user .message-content {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        border-bottom-right-radius: 4px;
-                    }
-                    
-                    .message.assistant .message-content {
-                        background: #f1f3f4;
-                        color: #333;
-                        border-bottom-left-radius: 4px;
-                    }
-                    
-                    .message-avatar {
-                        width: 32px;
-                        height: 32px;
-                        border-radius: 50%;
-                        margin: 0 8px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
                         font-weight: bold;
-                        font-size: 14px;
+                        padding-bottom: 10px;
+                        border-bottom: 1px solid var(--border-color);
+                        flex-shrink: 0; /* 防止头部被压缩 */
+                        text-align: center;
                     }
-                    
-                    .message.user .message-avatar {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                    }
-                    
-                    .message.assistant .message-avatar {
-                        background: #e8eaed;
-                        color: #5f6368;
-                    }
-                    
-                    .chat-input {
-                        padding: 16px;
-                        border-top: 1px solid #e0e0e0;
-                        background: white;
-                    }
-                    
-                    .input-container {
-                        display: flex;
-                        gap: 8px;
-                    }
-                    
-                    .message-input {
-                        flex: 1;
-                        padding: 12px 16px;
-                        border: 2px solid #e0e0e0;
-                        border-radius: 24px;
-                        font-size: 14px;
-                        outline: none;
-                        transition: border-color 0.3s;
-                    }
-                    
-                    .message-input:focus {
-                        border-color: #667eea;
-                    }
-                    
-                    .send-button {
-                        padding: 12px 20px;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        border: none;
-                        border-radius: 24px;
-                        cursor: pointer;
-                        font-weight: 600;
-                        transition: transform 0.2s;
-                    }
-                    
-                    .send-button:hover {
-                        transform: translateY(-1px);
-                    }
-                    
-                    .send-button:active {
-                        transform: translateY(0);
-                    }
-                    
-                    .typing-indicator {
-                        display: none;
-                        padding: 12px 16px;
-                        background: #f1f3f4;
-                        border-radius: 18px;
-                        border-bottom-left-radius: 4px;
-                        color: #666;
-                        font-style: italic;
-                        margin-bottom: 16px;
+
+                    /* --- 消息区域 --- */
+                    .chat-messages {
+                        flex-grow: 1; /* 占据所有可用空间 */
+                        overflow-y: auto;
+                        padding: 15px 5px;
+                        scroll-behavior: smooth;
                     }
                     
                     .welcome-message {
                         text-align: center;
-                        color: #666;
+                        color: var(--jb-secondary-text-color, #888888);
+                        margin-bottom: 20px;
+                    }
+
+                    /* --- 单条消息样式 --- */
+                    .message {
+                        display: flex;
+                        margin-bottom: 12px;
+                        max-width: 85%;
+                    }
+                    .message-content {
+                        padding: 10px 14px;
+                        border-radius: 18px;
+                        line-height: 1.5;
+                    }
+                    .message-avatar {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        flex-shrink: 0;
+                    }
+
+                    /* AI 助手消息 (靠左) */
+                    .message.assistant {
+                        align-self: flex-start;
+                    }
+                    .message.assistant .message-avatar {
+                        background-color: var(--accent-color);
+                        color: white;
+                        margin-right: 10px;
+                    }
+                    .message.assistant .message-content {
+                        background-color: var(--assistant-message-bg);
+                        border-top-left-radius: 4px;
+                    }
+
+                    /* 用户消息 (靠右) */
+                    .message.user {
+                        align-self: flex-end;
+                        flex-direction: row-reverse; /* 头像和内容反向 */
+                    }
+                    .message.user .message-avatar {
+                        background-color: #7d7d7d;
+                        color: white;
+                        margin-left: 10px;
+                    }
+                    .message.user .message-content {
+                        background-color: var(--user-message-bg);
+                        color: var(--jb-text-color); /* 确保在暗色模式下文字可读 */
+                        border-top-right-radius: 4px;
+                    }
+
+                    /* --- 输入区域 --- */
+                    .chat-input {
+                        padding-top: 10px;
+                        border-top: 1px solid var(--border-color);
+                        flex-shrink: 0; /* 防止输入区被压缩 */
+                    }
+                    .input-container {
+                        display: flex;
+                        align-items: center;
+                    }
+                    .message-input {
+                        flex-grow: 1;
+                        padding: 8px 12px;
+                        border: 1px solid var(--border-color);
+                        border-radius: 6px;
+                        background-color: var(--input-bg-color);
+                        color: var(--text-color);
+                        margin-right: 10px;
+                        outline: none;
+                        transition: border-color 0.2s;
+                    }
+                    .message-input:focus {
+                        border-color: var(--accent-color);
+                    }
+                    .message-input:disabled {
+                        background-color: var(--jb-disabled-background-color, #f5f5f5);
+                    }
+
+                    .send-button {
+                        padding: 8px 16px;
+                        border: none;
+                        border-radius: 6px;
+                        background-color: var(--button-bg-color);
+                        color: var(--button-text-color);
+                        font-weight: 500;
+                        cursor: pointer;
+                        transition: background-color 0.2s;
+                    }
+                    .send-button:hover {
+                        background-color: var(--button-hover-bg-color);
+                    }
+                    .send-button:disabled {
+                        opacity: 0.6;
+                        cursor: not-allowed;
+                    }
+
+                    /* --- 正在输入指示器 --- */
+                    .typing-indicator {
+                        display: none; /* 默认隐藏 */
+                        padding: 10px 0 5px 15px;
+                        color: var(--jb-secondary-text-color, #888888);
                         font-style: italic;
-                        margin: 20px 0;
+                    }
+
+                    /* --- 美化滚动条 --- */
+                    .chat-messages::-webkit-scrollbar {
+                        width: 6px;
+                    }
+                    .chat-messages::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    .chat-messages::-webkit-scrollbar-thumb {
+                        background-color: var(--jb-scrollbar-thumb-color, #cccccc);
+                        border-radius: 3px;
+                    }
+                    .chat-messages::-webkit-scrollbar-thumb:hover {
+                        background-color: var(--jb-scrollbar-thumb-hover-color, #aaaaaa);
                     }
                 </style>
             </head>
             <body>
                 <div class="chat-container">
-                    <div class="chat-header">
-                        🤖 AI助手
-                    </div>
+                    <div class="chat-header">🤖 AI 助手</div>
                     
                     <div class="chat-messages" id="chatMessages">
                         <div class="welcome-message">
@@ -228,7 +259,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()) {
                     </div>
                     
                     <div class="typing-indicator" id="typingIndicator">
-                        AI助手正在思考...
+                        AI 正在思考...
                     </div>
                     
                     <div class="chat-input">
@@ -238,71 +269,80 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()) {
                                    id="messageInput" 
                                    placeholder="输入你的消息..."
                                    onkeypress="handleKeyPress(event)">
-                            <button class="send-button" onclick="sendMessage()">发送</button>
+                            <button class="send-button" id="sendButton" onclick="send()">发送</button>
                         </div>
                     </div>
                 </div>
                 
                 <script>
-                    let jsQuery = null;
+                    const messageInput = document.getElementById('messageInput');
+                    const sendButton = document.getElementById('sendButton');
+                    const chatMessages = document.getElementById('chatMessages');
+                    const typingIndicator = document.getElementById('typingIndicator');
                     
-                    // 初始化JavaScript查询对象
-                    function initJSQuery() {
-                        if (window.Java) {
-                            jsQuery = window.Java.jsQuery;
+                    // 检查IDE主题并应用到html元素上，以便CSS可以适配
+                    // JBCefBrowser 会自动为 <html> 标签添加 'Theme--Darcula' 或 'Theme--Light' class
+                    // 但以防万一，我们也可以用 media query 作为备用
+                    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        if (!document.documentElement.className.includes('Theme--Darcula')) {
+                            // document.documentElement.classList.add('Theme--Darcula'); // JBCefBrowser通常会处理，此行可选
                         }
                     }
-                    
-                    // 处理回车键
+
                     function handleKeyPress(event) {
-                        if (event.key === 'Enter') {
-                            sendMessage();
+                        if (event.key === 'Enter' && !sendButton.disabled) {
+                            send();
                         }
                     }
-                    
-                    // 发送消息
-                    function sendMessage() {
-                        const input = document.getElementById('messageInput');
-                        const message = input.value.trim();
-                        
+
+                    function send() {
+                        const message = messageInput.value.trim();
                         if (message === '') return;
-                        
-                        // 添加用户消息
+
                         addMessage(message, 'user');
-                        input.value = '';
+                        messageInput.value = '';
                         
-                        // 显示输入指示器
+                        setInteractionDisabled(true);
                         showTypingIndicator();
-                        
-                        // 发送到Java后端
-                        if (jsQuery) {
-                            jsQuery.invoke(message, function(response) {
-                                hideTypingIndicator();
-                                addMessage(response, 'assistant');
-                            });
+
+                        if (window.sendMessage) {
+                            window.sendMessage(
+                                message,
+                                function(response) { // onSuccess
+                                    hideTypingIndicator();
+                                    addMessage(response, 'assistant');
+                                    setInteractionDisabled(false);
+                                },
+                                function(error) { // onFailure
+                                    hideTypingIndicator();
+                                    addMessage(`【错误】${'$'}{error}`, 'assistant');
+                                    setInteractionDisabled(false);
+                                }
+                            );
                         } else {
-                            // 模拟响应（如果JavaScript桥接不可用）
+                            // 备用逻辑，以防桥接未初始化
                             setTimeout(() => {
                                 hideTypingIndicator();
-                                addMessage('抱歉，JavaScript桥接不可用', 'assistant');
+                                addMessage('抱歉，与后端的连接似乎已断开。', 'assistant');
+                                setInteractionDisabled(false);
                             }, 1000);
                         }
                     }
-                    
-                    // 添加消息到聊天区域
+
                     function addMessage(content, sender) {
-                        const chatMessages = document.getElementById('chatMessages');
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${'$'}{sender}`;
-                        
+
                         const avatar = document.createElement('div');
                         avatar.className = 'message-avatar';
                         avatar.textContent = sender === 'user' ? '你' : 'AI';
-                        
+
                         const messageContent = document.createElement('div');
                         messageContent.className = 'message-content';
+                        // 为了安全和格式，纯文本内容使用 textContent
                         messageContent.textContent = content;
-                        
+
+                        // 根据发送者决定头像和内容的顺序
                         if (sender === 'user') {
                             messageDiv.appendChild(messageContent);
                             messageDiv.appendChild(avatar);
@@ -310,43 +350,33 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()) {
                             messageDiv.appendChild(avatar);
                             messageDiv.appendChild(messageContent);
                         }
-                        
+
                         chatMessages.appendChild(messageDiv);
-                        
                         // 滚动到底部
                         chatMessages.scrollTop = chatMessages.scrollHeight;
                     }
-                    
-                    // 显示输入指示器
+
                     function showTypingIndicator() {
-                        const indicator = document.getElementById('typingIndicator');
-                        indicator.style.display = 'block';
-                        document.getElementById('chatMessages').scrollTop = 
-                            document.getElementById('chatMessages').scrollHeight;
+                        typingIndicator.style.display = 'block';
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
                     }
-                    
-                    // 隐藏输入指示器
+
                     function hideTypingIndicator() {
-                        const indicator = document.getElementById('typingIndicator');
-                        indicator.style.display = 'none';
+                        typingIndicator.style.display = 'none';
                     }
                     
-                    // 页面加载完成后初始化
-                    document.addEventListener('DOMContentLoaded', function() {
-                        initJSQuery();
-                    });
+                    function setInteractionDisabled(disabled) {
+                        messageInput.disabled = disabled;
+                        sendButton.disabled = disabled;
+                        if (!disabled) {
+                            messageInput.focus();
+                        }
+                    }
                 </script>
             </body>
             </html>
         """.trimIndent()
-        
+
         browser.loadHTML(htmlContent)
     }
-    
-    private fun sendResponseToJavaScript(response: String) {
-        browser.cefBrowser.executeJavaScript(
-            "if (typeof addMessage === 'function') { addMessage('${response.replace("'", "\\'")}', 'assistant'); }",
-            browser.cefBrowser.url, 0
-        )
-    }
-} 
+}
