@@ -8,7 +8,8 @@ import com.intellij.openapi.project.Project
 class CodeCommandHandler : CommandHandler {
     
     override fun canHandle(message: String): Boolean {
-        return message.contains("代码") || message.contains("code")
+        val trimmedMessage = message.trim()
+        return trimmedMessage.startsWith("/code")
     }
     
     override fun handle(message: String, project: Project): String {

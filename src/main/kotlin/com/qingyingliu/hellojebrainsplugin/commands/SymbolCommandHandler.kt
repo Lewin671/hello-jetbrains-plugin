@@ -10,7 +10,8 @@ import com.intellij.psi.PsiManager
 class SymbolCommandHandler : CommandHandler {
     
     override fun canHandle(message: String): Boolean {
-        return message.contains("符号") || message.contains("symbol")
+        val trimmedMessage = message.trim()
+        return trimmedMessage.startsWith("/symbol")
     }
     
     override fun handle(message: String, project: Project): String {

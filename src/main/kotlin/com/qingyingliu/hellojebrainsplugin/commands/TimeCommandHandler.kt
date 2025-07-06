@@ -10,7 +10,8 @@ import java.time.format.DateTimeFormatter
 class TimeCommandHandler : CommandHandler {
     
     override fun canHandle(message: String): Boolean {
-        return message.contains("时间") || message.contains("time")
+        val trimmedMessage = message.trim()
+        return trimmedMessage.startsWith("/time")
     }
     
     override fun handle(message: String, project: Project): String {

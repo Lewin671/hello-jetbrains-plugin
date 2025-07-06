@@ -50,10 +50,9 @@ class ChatService(private val project: Project) {
      */
     fun quickTest() {
         val testCases = listOf(
-            "lint /Users/qingyingliu/IdeaProjects/hello-java/src/Test.kt",
-            "lint Test.kt",
-            "检查 /path/to/file.kt",
-            "问题 src/main/kotlin/MyFile.kt"
+            "/lint /Users/qingyingliu/IdeaProjects/hello-java/src/Test.kt",
+            "/lint Test.kt",
+            "/lint"
         )
         
         println("=== 快速测试 lint 命令 ===")
@@ -84,24 +83,70 @@ class ChatService(private val project: Project) {
      */
     fun quickTestUsages() {
         val testCases = listOf(
-            "usages String",
-            "引用 ChatService",
-            "用法 java.util.List",
-            "usages processMessage",
-            "引用 getUsagesForName",
-            "用法 findClassByName",
-            // 测试简单类名（无需包名）
-            "usages ChatService",
-            "引用 ChatPanel",
-            "用法 ChatAction",
-            "usages",
-            "引用"
+            "/usages String",
+            "/usages ChatService",
+            "/usages"
         )
         
         println("=== 快速测试 usages 命令 ===")
         for (testCase in testCases) {
             println("\n测试: '$testCase'")
             testUsagesCommand(testCase)
+        }
+    }
+    
+    /**
+     * 测试其他斜杠命令
+     */
+    fun testSlashCommands() {
+        val testCases = listOf(
+            "/help",
+            "/project",
+            "/time",
+            "/file",
+            "/code",
+            "/symbol"
+        )
+        
+        println("=== 测试斜杠命令 ===")
+        for (testCase in testCases) {
+            println("\n测试: '$testCase'")
+            val result = processMessage(testCase)
+            println("输出: $result")
+        }
+    }
+    
+    /**
+     * 综合测试所有斜杠命令
+     */
+    fun comprehensiveTest() {
+        println("=== 综合测试所有斜杠命令 ===")
+        
+        // 测试斜杠命令
+        println("\n1. 测试斜杠命令格式:")
+        testSlashCommands()
+        
+        // 测试 lint 和 usages 命令
+        println("\n2. 测试 lint 和 usages 命令:")
+        quickTest()
+        quickTestUsages()
+        
+        // 测试原有格式（应该不匹配）
+        println("\n3. 测试原有格式（应该不匹配）:")
+        val originalCommands = listOf(
+            "help",
+            "项目",
+            "时间",
+            "文件",
+            "代码",
+            "符号",
+            "lint",
+            "usages"
+        )
+        for (cmd in originalCommands) {
+            println("\n测试: '$cmd'")
+            val result = processMessage(cmd)
+            println("输出: $result")
         }
     }
 } 

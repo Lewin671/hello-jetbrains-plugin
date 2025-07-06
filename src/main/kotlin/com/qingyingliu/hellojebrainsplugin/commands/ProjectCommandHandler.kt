@@ -8,7 +8,8 @@ import com.intellij.openapi.project.Project
 class ProjectCommandHandler : CommandHandler {
     
     override fun canHandle(message: String): Boolean {
-        return message.contains("项目") || message.contains("project")
+        val trimmedMessage = message.trim()
+        return trimmedMessage.startsWith("/project")
     }
     
     override fun handle(message: String, project: Project): String {

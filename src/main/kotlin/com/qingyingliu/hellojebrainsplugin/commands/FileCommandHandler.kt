@@ -8,7 +8,8 @@ import com.intellij.openapi.project.Project
 class FileCommandHandler : CommandHandler {
     
     override fun canHandle(message: String): Boolean {
-        return message.contains("文件") || message.contains("file")
+        val trimmedMessage = message.trim()
+        return trimmedMessage.startsWith("/file")
     }
     
     override fun handle(message: String, project: Project): String {
