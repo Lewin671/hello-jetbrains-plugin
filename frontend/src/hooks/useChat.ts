@@ -73,6 +73,7 @@ export const useChat = () => {
     let isFirstChunk = true;
     let toolCalls: { toolName: string; toolInput: any; toolOutput: string; timestamp: string }[] = [];
     let assistantMessageIndex = -1;
+    let timeline: { type: 'text' | 'tool'; data: string | any; timestamp: string }[] = [];
 
     try {
       console.log('Calling ChatService.sendMessageWithStreaming...');
@@ -107,7 +108,15 @@ export const useChat = () => {
               assistantMessage = chunk;
               console.log('Creating first assistant message:', assistantMessage);
 
+              // 添加到时间线
+              timeline.push({
+                type: 'text',
+                data: assistantMessage,
+                timestamp: new Date().toISOString()
+              });
+
               const newMsg = createMessage(assistantMessage, 'assistant');
+              newMsg.timeline = [...timeline];
               setState(prev => {
                 const newMessages = [...prev.messages, newMsg];
                 assistantMessageIndex = newMessages.length - 1;
@@ -118,11 +127,30 @@ export const useChat = () => {
               // 后续chunk时更新最后一条消息
               assistantMessage += chunk;
               console.log('Updating assistant message:', assistantMessage);
+              
+              // 更新时间线中的最后一个文本项
+              const lastTimelineItem = timeline[timeline.length - 1];
+              if (lastTimelineItem && lastTimelineItem.type === 'text') {
+                lastTimelineItem.data = assistantMessage;
+              } else {
+                // 如果最后一项不是文本，添加新的文本项
+                timeline.push({
+                  type: 'text',
+                  data: assistantMessage,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
               setState(prev => ({
                 ...prev,
                 messages: prev.messages.map((msg, index) => 
                   index === assistantMessageIndex 
-                    ? { ...msg, content: assistantMessage, toolCalls: toolCalls.length > 0 ? toolCalls : undefined }
+                    ? { 
+                        ...msg, 
+                        content: assistantMessage, 
+                        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                        timeline: [...timeline]
+                      }
                     : msg
                 )
               }));
@@ -137,7 +165,14 @@ export const useChat = () => {
             };
             toolCalls.push(toolCallWithTimestamp);
             
-            // 更新助手消息，包含所有工具调用
+            // 添加到时间线
+            timeline.push({
+              type: 'tool',
+              data: toolCallWithTimestamp,
+              timestamp: new Date().toISOString()
+            });
+            
+            // 更新助手消息，包含时间线
             setState(prev => ({
               ...prev,
               messages: prev.messages.map((msg, index) => 
@@ -145,22 +180,35 @@ export const useChat = () => {
                   ? { 
                       ...msg, 
                       toolCalls: [...toolCalls],
+                      timeline: [...timeline],
                       content: msg.content || assistantMessage
                     }
                   : msg
               )
             }));
             
-            console.log('🔧 Tool call added to assistant message:', toolCallWithTimestamp);
-            console.log('🔧 Current assistantMessageIndex:', assistantMessageIndex);
-            console.log('🔧 Current toolCalls array:', toolCalls);
+            console.log('🔧 Tool call added to timeline:', toolCallWithTimestamp);
+            console.log('🔧 Current timeline:', timeline);
           },
           onSuccess: (finalMessage: string) => {
             // 流式响应完成
             console.log('onSuccess called with:', finalMessage);
             
-            // 确保最终消息包含所有工具调用
+            // 确保最终消息包含所有工具调用和时间线
             if (assistantMessageIndex >= 0) {
+              // 更新时间线中最后的文本内容
+              const lastTimelineItem = timeline[timeline.length - 1];
+              if (lastTimelineItem && lastTimelineItem.type === 'text') {
+                lastTimelineItem.data = finalMessage || assistantMessage;
+              } else if (finalMessage) {
+                // 如果最后一项不是文本，且有最终消息，添加新的文本项
+                timeline.push({
+                  type: 'text',
+                  data: finalMessage,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
               setState(prev => ({
                 ...prev,
                 messages: prev.messages.map((msg, index) => 
@@ -168,7 +216,8 @@ export const useChat = () => {
                     ? { 
                         ...msg, 
                         content: finalMessage || assistantMessage,
-                        toolCalls: toolCalls.length > 0 ? toolCalls : undefined
+                        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                        timeline: timeline.length > 0 ? [...timeline] : undefined
                       }
                     : msg
                 )
@@ -178,7 +227,7 @@ export const useChat = () => {
             setIsTyping(false);
             setIsDisabled(false);
             console.log('Message sent successfully:', finalMessage);
-            console.log('Final toolCalls array:', toolCalls);
+            console.log('Final timeline:', timeline);
           },
           onFailure: (error: string) => {
             console.error('onFailure called with:', error);

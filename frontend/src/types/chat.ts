@@ -14,6 +14,16 @@ export interface Message {
     toolOutput: string;
     timestamp: string;
   }[];
+  timeline?: {
+    type: 'text' | 'tool';
+    data: string | {
+      toolName: string;
+      toolInput: any;
+      toolOutput: string;
+      timestamp: string;
+    };
+    timestamp: string;
+  }[];
 }
 
 export interface ChatState {

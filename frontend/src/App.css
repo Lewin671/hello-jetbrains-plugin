@@ -217,6 +217,30 @@ body {
     margin-bottom: 0;
 }
 
+/* --- 时间线样式 --- */
+.timeline-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.timeline-item {
+    margin: 0;
+}
+
+.timeline-text {
+    margin: 8px 0;
+    line-height: 1.5;
+}
+
+.timeline-tool {
+    margin: 8px 0;
+}
+
+.timeline-tool .tool-call-info {
+    margin-bottom: 0;
+}
+
 .tool-header {
     display: flex;
     align-items: center;
