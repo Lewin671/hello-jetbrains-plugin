@@ -2,6 +2,7 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
     id("org.jetbrains.intellij.platform") version "2.5.0"
+    id("com.github.node-gradle.node") version "7.0.2"
 }
 
 group = "com.qingyingliu"
@@ -14,23 +15,13 @@ repositories {
     }
 }
 
-// Configure Gradle IntelliJ Plugin
-// Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     intellijPlatform {
         create("IC", "2025.1")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
-
-        // Add necessary plugin dependencies for compilation here, example:
-        // bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
-
     }
-    
-    // Add Swing and UI dependencies
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
-
-    // JUnit for unit testing support
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -39,7 +30,6 @@ intellijPlatform {
         ideaVersion {
             sinceBuild = "251"
         }
-
         changeNotes = """
       Initial version
     """.trimIndent()
@@ -47,7 +37,6 @@ intellijPlatform {
 }
 
 tasks {
-    // Set the JVM compatibility versions
     withType<JavaCompile> {
         sourceCompatibility = "17"
         targetCompatibility = "17"
@@ -55,19 +44,41 @@ tasks {
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         kotlinOptions.jvmTarget = "17"
     }
+    named("instrumentCode") {
+        enabled = false
+    }
+    named("instrumentTestCode") {
+        enabled = false
+    }
+    withType<Test> {
+        ignoreFailures = true
+    }
 }
 
-// Disable the IntelliJ code instrumentation step to avoid failure on systems without the required JDK layout
-tasks.named("instrumentCode") {
-    enabled = false
+// Node.js plugin configuration
+node {
+    version.set("20.11.0")
+    download.set(true)
+    npmCommand.set("npm")
 }
 
-tasks.named("instrumentTestCode") {
-    enabled = false
+// Frontend build tasks
+val buildFrontend by tasks.registering(com.github.gradle.node.npm.task.NpmTask::class) {
+    group = "build"
+    description = "Install frontend dependencies"
+    workingDir.set(file("frontend"))
+    args.set(listOf("install"))
 }
 
-tasks.withType<Test> {
-    // 单元测试仍会运行并生成报告，但失败不会导致整体构建失败，
-    // 这样可以避免在没有实际编译错误时因断言失败而中断 CI。
-    ignoreFailures = true
+val compileFrontend by tasks.registering(com.github.gradle.node.npm.task.NpmTask::class) {
+    group = "build"
+    description = "Build frontend assets"
+    workingDir.set(file("frontend"))
+    dependsOn(buildFrontend)
+    args.set(listOf("run", "build"))
+}
+
+// Make sure backend build depends on frontend build
+tasks.named("runIde") {
+    dependsOn(compileFrontend)
 }
