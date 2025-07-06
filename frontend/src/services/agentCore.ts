@@ -24,6 +24,10 @@ export class AgentCore {
     }
 
     try {
+      // 先初始化工具
+      await ToolManager.initialize();
+      console.log(`${LOG_PREFIXES.TOOL} Tools initialized: ${ToolManager.getToolNames().join(', ')}`);
+      
       const model = this.createModel();
       
       // 创建ReAct agent

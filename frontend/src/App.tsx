@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import './App.css';
 import { useChat } from './hooks/useChat';
 import { useAutoScroll } from './hooks/useAutoScroll';
@@ -9,6 +9,7 @@ import { CHAT_CONSTANTS } from './constants/chat';
 import { isValidMessage, focusInput } from './utils/chatUtils';
 import { testOllamaAndAgent, testStreamingAgent, testOllamaStreaming } from './services/ollamaTest';
 import { LangGraphAgentService } from './services/langGraphAgentService';
+import { ToolManager } from './tools';
 import './testTools'; // 导入测试脚本
 
 function App() {
@@ -25,6 +26,21 @@ function App() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useAutoScroll([messages, isTyping]);
+
+  // 在组件挂载时初始化工具
+  useEffect(() => {
+    async function initializeTools() {
+      try {
+        await ToolManager.initialize();
+        console.log('🔧 Tools initialized in App component');
+        console.log('🔧 Available tools:', ToolManager.getToolNames());
+      } catch (error) {
+        console.error('🔧 Failed to initialize tools in App:', error);
+      }
+    }
+    
+    initializeTools();
+  }, []);
 
   const handleSend = () => {
     if (!isValidMessage(inputValue)) return;
@@ -61,18 +77,35 @@ function App() {
     sendMessage('今天天气怎么样？请帮我搜索一下。');
   };
 
-  const handleSimpleToolTest = () => {
+  const handleSimpleToolTest = async () => {
     console.log('简单工具调用测试...');
-    // 直接创建一个工具调用消息来测试显示
-    const testToolCall = {
-      toolName: 'search',
-      toolInput: { query: '今天天气怎么样？' },
-      toolOutput: '今天天气晴朗，温度25度，适合外出活动。'
-    };
     
-    // 使用addToolCallMessage函数来测试工具调用显示
-    addToolCallMessage(testToolCall);
-    console.log('🔧 Tool call message added:', testToolCall);
+    try {
+      // 测试工具管理器
+      console.log('🔧 Tool count:', ToolManager.getToolCount());
+      console.log('🔧 Tool names:', ToolManager.getToolNames());
+      
+      // 测试计算器工具
+      const calcResult = await ToolManager.executeTool('calculator', { expression: '2+3' });
+      console.log('🧮 Calculator result:', calcResult);
+      
+      // 测试搜索工具
+      const searchResult = await ToolManager.executeTool('search', { query: '天气' });
+      console.log('🔍 Search result:', searchResult);
+      
+      // 创建一个工具调用消息来测试显示
+      const testToolCall = {
+        toolName: 'search',
+        toolInput: { query: '今天天气怎么样？' },
+        toolOutput: searchResult.result
+      };
+      
+      // 使用addToolCallMessage函数来测试工具调用显示
+      addToolCallMessage(testToolCall);
+      console.log('🔧 Tool call message added:', testToolCall);
+    } catch (error) {
+      console.error('🔧 Tool test failed:', error);
+    }
   };
 
   return (
