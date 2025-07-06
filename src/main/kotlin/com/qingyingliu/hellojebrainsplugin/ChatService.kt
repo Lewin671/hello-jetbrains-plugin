@@ -149,4 +149,23 @@ class ChatService(private val project: Project) {
             println("输出: $result")
         }
     }
+    
+    /**
+     * 测试绝对路径的 lint 命令
+     */
+    fun testAbsolutePathLint() {
+        val testCases = listOf(
+            "/lint /Users/qingyingliu/IdeaProjects/hello-java/src/AAA.java",
+            "/lint /Users/qingyingliu/IdeaProjects/hello-java/src/Test.kt",
+            "/lint /path/to/hello/file.txt",
+            "/lint /Users/qingyingliu/Documents/hello-world.py"
+        )
+        
+        println("=== 测试绝对路径的 lint 命令 ===")
+        for (testCase in testCases) {
+            println("\n测试: '$testCase'")
+            val result = processMessage(testCase)
+            println("输出: $result")
+        }
+    }
 } 

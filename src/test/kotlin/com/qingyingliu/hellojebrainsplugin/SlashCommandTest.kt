@@ -117,4 +117,38 @@ class SlashCommandTest : BasePlatformTestCase() {
         assertFalse(handler.canHandle("hello"))
         assertFalse(handler.canHandle("random text"))
     }
+    
+    fun testGreetingCommandHandler() {
+        val handler = GreetingCommandHandler()
+        
+        // 测试正确的问候语
+        assertTrue(handler.canHandle("你好"))
+        assertTrue(handler.canHandle("hello"))
+        assertTrue(handler.canHandle("hi"))
+        assertTrue(handler.canHandle("你好！"))
+        assertTrue(handler.canHandle("hello!"))
+        assertTrue(handler.canHandle("hi!"))
+        
+        // 测试包含问候词但不应该匹配的消息
+        assertFalse(handler.canHandle("/lint /Users/qingyingliu/IdeaProjects/hello-java/src/AAA.java"))
+        assertFalse(handler.canHandle("hello world"))
+        assertFalse(handler.canHandle("你好吗"))
+        assertFalse(handler.canHandle("hello there"))
+        assertFalse(handler.canHandle("random text with hello"))
+        assertFalse(handler.canHandle("path/to/hello/file.txt"))
+    }
+    
+    fun testAbsolutePathLintCommand() {
+        val handler = LintCommandHandler()
+        
+        // 测试绝对路径的 lint 命令
+        assertTrue(handler.canHandle("/lint /Users/qingyingliu/IdeaProjects/hello-java/src/AAA.java"))
+        assertTrue(handler.canHandle("/lint /Users/qingyingliu/IdeaProjects/hello-java/src/Test.kt"))
+        assertTrue(handler.canHandle("/lint /path/to/hello/file.txt"))
+        assertTrue(handler.canHandle("/lint /Users/qingyingliu/Documents/hello-world.py"))
+        
+        // 测试相对路径
+        assertTrue(handler.canHandle("/lint Test.kt"))
+        assertTrue(handler.canHandle("/lint src/main/kotlin/MyFile.kt"))
+    }
 } 

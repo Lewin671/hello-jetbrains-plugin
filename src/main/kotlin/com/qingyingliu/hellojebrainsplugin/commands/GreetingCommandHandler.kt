@@ -8,7 +8,15 @@ import com.intellij.openapi.project.Project
 class GreetingCommandHandler : CommandHandler {
     
     override fun canHandle(message: String): Boolean {
-        return message.contains("你好") || message.contains("hello")
+        val trimmedMessage = message.trim().lowercase()
+        
+        // 只匹配完整的问候语，而不是包含问候词的任何消息
+        return trimmedMessage == "你好" || 
+               trimmedMessage == "hello" ||
+               trimmedMessage == "hi" ||
+               trimmedMessage == "你好！" ||
+               trimmedMessage == "hello!" ||
+               trimmedMessage == "hi!"
     }
     
     override fun handle(message: String, project: Project): String {
@@ -18,7 +26,7 @@ class GreetingCommandHandler : CommandHandler {
                 "• 提供编程建议\n" +
                 "• 回答技术问题\n" +
                 "• 查看项目信息\n\n" +
-                "试试输入 '帮助' 查看更多功能！"
+                "试试输入 '/help' 查看更多功能！"
     }
     
     override fun getPriority(): Int = 1
