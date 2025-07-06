@@ -32,13 +32,7 @@ class CommandChain(private val handlers: List<CommandHandler>) {
          */
         fun createDefaultChain(): CommandChain {
             val handlers = listOf(
-                GreetingCommandHandler(),
                 HelpCommandHandler(),
-                TimeCommandHandler(),
-                ProjectCommandHandler(),
-                FileCommandHandler(),
-                CodeCommandHandler(),
-                SymbolCommandHandler(),
                 LintCommandHandler(),
                 UsagesCommandHandler()
             )

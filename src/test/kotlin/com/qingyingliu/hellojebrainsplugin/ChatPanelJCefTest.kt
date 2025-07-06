@@ -24,8 +24,8 @@ class ChatPanelJCefTest : BasePlatformTestCase() {
         val helpResponse = chatService.processMessage("/help")
         assertTrue("帮助命令应该返回帮助信息", helpResponse.contains("📋 可用命令"))
         
-        val timeResponse = chatService.processMessage("/time")
-        assertTrue("时间命令应该返回时间信息", timeResponse.contains("🕐 当前时间"))
+        val lintResponse = chatService.processMessage("/lint")
+        assertTrue("Lint命令应该返回代码检查信息", lintResponse.contains("🔍 代码检查问题"))
     }
     
     fun testSlashCommands() {
@@ -34,11 +34,8 @@ class ChatPanelJCefTest : BasePlatformTestCase() {
         // 测试斜杠命令
         val commands = listOf(
             "/help" to "📋 可用命令",
-            "/time" to "🕐 当前时间",
-            "/project" to "📁 项目信息",
-            "/file" to "📂 项目文件结构",
-            "/code" to "💻 编程帮助",
-            "/symbol" to "🔖 当前打开文件中的符号"
+            "/lint" to "🔍 代码检查问题",
+            "/usages" to "🔍 引用查找命令帮助"
         )
         
         for ((command, expectedContent) in commands) {
@@ -53,7 +50,7 @@ class ChatPanelJCefTest : BasePlatformTestCase() {
         
         // 测试 lint 命令
         val lintResponse = chatService.processMessage("/lint")
-        assertTrue("Lint命令应该返回帮助信息", lintResponse.contains("🔍 代码检查命令帮助"))
+        assertTrue("Lint命令应该返回帮助信息", lintResponse.contains("🔍 代码检查问题"))
         
         // 测试 usages 命令
         val usagesResponse = chatService.processMessage("/usages")
