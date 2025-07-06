@@ -20,6 +20,7 @@
     <depends>com.intellij.modules.lang</depends>
     <depends>com.intellij.modules.java</depends>
 
+
     <!-- Depend on Kotlin plugin to access Kotlin PSI APIs -->
 <!--    <depends>org.jetbrains.kotlin</depends>-->
 
@@ -42,6 +43,14 @@
                 description="打开AI聊天助手">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt C"/>
+        </action>
+        
+        <action id="ChatPanelDemo" 
+                class="com.qingyingliu.hellojebrainsplugin.ChatPanelDemo" 
+                text="JCEF 聊天演示" 
+                description="打开 JCEF 聊天面板演示">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt D"/>
         </action>
     </actions>
 </idea-plugin>
