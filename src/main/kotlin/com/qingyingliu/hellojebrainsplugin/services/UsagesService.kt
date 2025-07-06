@@ -7,6 +7,7 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiRecursiveElementWalkingVisitor
 import com.intellij.psi.PsiNameIdentifierOwner
+import com.intellij.openapi.application.ReadAction
 
 /**
  * 引用查找服务
@@ -17,98 +18,100 @@ class UsagesService(private val project: Project) {
      * 获取指定名称（类名或方法名）的所有引用
      */
     fun getUsagesForName(name: String): String {
-        val builder = StringBuilder("🔍 查找 '$name' 的引用：\n\n")
-        
-        try {
-            // 1. 首先尝试查找类定义
-            val psiClass = findClassByName(name)
+        return ReadAction.compute<String, RuntimeException> {
+            val builder = StringBuilder("🔍 查找 '$name' 的引用：\n\n")
             
-            if (psiClass != null) {
-                // 检查是否有多个匹配的类
-                val allMatchingClasses = findClassesByNameInProject(name)
+            try {
+                // 1. 首先尝试查找类定义
+                val psiClass = findClassByName(name)
                 
-                // 找到类，显示类信息
-                builder.append("📋 类信息：\n")
-                builder.append("• 类名: ${psiClass.name}\n")
-                builder.append("• 全限定名: ${psiClass.qualifiedName}\n")
-                builder.append("• 包名: ${psiClass.qualifiedName?.substringBeforeLast('.') ?: "未知"}\n")
-                builder.append("• 文件: ${psiClass.containingFile?.name ?: "未知"}\n")
-                builder.append("• 位置: ${psiClass.containingFile?.virtualFile?.path ?: "未知"}\n\n")
-                
-                // 如果找到多个类，显示所有选项
-                if (allMatchingClasses.size > 1) {
-                    builder.append("🔍 找到多个匹配的类：\n")
-                    allMatchingClasses.forEachIndexed { index, cls ->
-                        builder.append("  ${index + 1}. ${cls.qualifiedName} (在 ${cls.containingFile?.name ?: "未知文件"})\n")
+                if (psiClass != null) {
+                    // 检查是否有多个匹配的类
+                    val allMatchingClasses = findClassesByNameInProject(name)
+                    
+                    // 找到类，显示类信息
+                    builder.append("📋 类信息：\n")
+                    builder.append("• 类名: ${psiClass.name}\n")
+                    builder.append("• 全限定名: ${psiClass.qualifiedName}\n")
+                    builder.append("• 包名: ${psiClass.qualifiedName?.substringBeforeLast('.') ?: "未知"}\n")
+                    builder.append("• 文件: ${psiClass.containingFile?.name ?: "未知"}\n")
+                    builder.append("• 位置: ${psiClass.containingFile?.virtualFile?.path ?: "未知"}\n\n")
+                    
+                    // 如果找到多个类，显示所有选项
+                    if (allMatchingClasses.size > 1) {
+                        builder.append("🔍 找到多个匹配的类：\n")
+                        allMatchingClasses.forEachIndexed { index, cls ->
+                            builder.append("  ${index + 1}. ${cls.qualifiedName} (在 ${cls.containingFile?.name ?: "未知文件"})\n")
+                        }
+                        builder.append("\n💡 提示：当前显示第一个类的引用。如需查看其他类，请使用完整包名。\n\n")
                     }
-                    builder.append("\n💡 提示：当前显示第一个类的引用。如需查看其他类，请使用完整包名。\n\n")
+                    
+                    // 查找类的所有引用
+                    val usages = findUsages(psiClass)
+                    
+                    if (usages.isEmpty()) {
+                        builder.append("✅ 没有找到任何引用\n\n")
+                        builder.append("💡 说明：\n")
+                        builder.append("• 这个类可能没有被使用\n")
+                        builder.append("• 或者引用在注释或字符串中（不会被索引）\n")
+                        builder.append("• 或者引用在项目范围之外\n\n")
+                    } else {
+                        builder.append("📊 找到 ${usages.size} 个引用：\n\n")
+                        displayUsages(usages, builder)
+                    }
+                    
+                    return@compute builder.toString()
                 }
                 
-                // 查找类的所有引用
-                val usages = findUsages(psiClass)
+                // 2. 如果没有找到类，尝试查找方法
+                val methods = findMethodsByName(name)
                 
-                if (usages.isEmpty()) {
-                    builder.append("✅ 没有找到任何引用\n\n")
-                    builder.append("💡 说明：\n")
-                    builder.append("• 这个类可能没有被使用\n")
-                    builder.append("• 或者引用在注释或字符串中（不会被索引）\n")
-                    builder.append("• 或者引用在项目范围之外\n\n")
-                } else {
-                    builder.append("📊 找到 ${usages.size} 个引用：\n\n")
-                    displayUsages(usages, builder)
+                if (methods.isNotEmpty()) {
+                    builder.append("📋 方法信息：\n")
+                    builder.append("• 方法名: $name\n")
+                    builder.append("• 找到 ${methods.size} 个方法定义\n\n")
+                    
+                    // 查找所有方法的引用
+                    val allUsages = mutableListOf<PsiElement>()
+                    methods.forEach { method ->
+                        val methodUsages = findUsages(method)
+                        allUsages.addAll(methodUsages)
+                    }
+                    
+                    if (allUsages.isEmpty()) {
+                        builder.append("✅ 没有找到任何引用\n\n")
+                        builder.append("💡 说明：\n")
+                        builder.append("• 这些方法可能没有被调用\n")
+                        builder.append("• 或者调用在注释或字符串中（不会被索引）\n")
+                        builder.append("• 或者调用在项目范围之外\n\n")
+                    } else {
+                        builder.append("📊 找到 ${allUsages.size} 个引用：\n\n")
+                        displayUsages(allUsages, builder)
+                    }
+                    
+                    return@compute builder.toString()
                 }
                 
-                return builder.toString()
+                // 3. 如果既没有找到类也没有找到方法
+                builder.append("❌ 未找到类或方法 '$name'\n\n")
+                builder.append("💡 提示：\n")
+                builder.append("• 请检查名称是否正确（区分大小写）\n")
+                builder.append("• 如果是内部类，请使用 'OuterClass.InnerClass' 格式\n")
+                builder.append("• 如果是全限定类名，请包含包名\n")
+                builder.append("• 如果是方法，请确保方法名正确\n")
+                builder.append("• 例如：'java.lang.String'、'MyClass'、'processMessage'\n\n")
+                
+            } catch (e: Exception) {
+                builder.append("❌ 查找过程中发生错误：${e.message}\n\n")
+                builder.append("💡 可能的原因：\n")
+                builder.append("• 项目索引可能不完整\n")
+                builder.append("• 名称格式不正确\n")
+                builder.append("• 项目配置问题\n\n")
+                e.printStackTrace()
             }
             
-            // 2. 如果没有找到类，尝试查找方法
-            val methods = findMethodsByName(name)
-            
-            if (methods.isNotEmpty()) {
-                builder.append("📋 方法信息：\n")
-                builder.append("• 方法名: $name\n")
-                builder.append("• 找到 ${methods.size} 个方法定义\n\n")
-                
-                // 查找所有方法的引用
-                val allUsages = mutableListOf<PsiElement>()
-                methods.forEach { method ->
-                    val methodUsages = findUsages(method)
-                    allUsages.addAll(methodUsages)
-                }
-                
-                if (allUsages.isEmpty()) {
-                    builder.append("✅ 没有找到任何引用\n\n")
-                    builder.append("💡 说明：\n")
-                    builder.append("• 这些方法可能没有被调用\n")
-                    builder.append("• 或者调用在注释或字符串中（不会被索引）\n")
-                    builder.append("• 或者调用在项目范围之外\n\n")
-                } else {
-                    builder.append("📊 找到 ${allUsages.size} 个引用：\n\n")
-                    displayUsages(allUsages, builder)
-                }
-                
-                return builder.toString()
-            }
-            
-            // 3. 如果既没有找到类也没有找到方法
-            builder.append("❌ 未找到类或方法 '$name'\n\n")
-            builder.append("💡 提示：\n")
-            builder.append("• 请检查名称是否正确（区分大小写）\n")
-            builder.append("• 如果是内部类，请使用 'OuterClass.InnerClass' 格式\n")
-            builder.append("• 如果是全限定类名，请包含包名\n")
-            builder.append("• 如果是方法，请确保方法名正确\n")
-            builder.append("• 例如：'java.lang.String'、'MyClass'、'processMessage'\n\n")
-            
-        } catch (e: Exception) {
-            builder.append("❌ 查找过程中发生错误：${e.message}\n\n")
-            builder.append("💡 可能的原因：\n")
-            builder.append("• 项目索引可能不完整\n")
-            builder.append("• 名称格式不正确\n")
-            builder.append("• 项目配置问题\n\n")
-            e.printStackTrace()
+            builder.toString()
         }
-        
-        return builder.toString()
     }
     
     /**
@@ -183,17 +186,19 @@ class UsagesService(private val project: Project) {
      * 在项目范围内根据类名查找所有匹配的类
      */
     private fun findClassesByNameInProject(className: String): List<PsiClass> {
-        val classes = mutableListOf<PsiClass>()
-        val psiManager = PsiManager.getInstance(project)
-        
-        try {
-            // 遍历项目中的所有文件来查找类
-            val rootDir = project.baseDir ?: return emptyList()
-            collectClassesFromDirectory(rootDir, className, classes, psiManager)
-            return classes
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return emptyList()
+        return ReadAction.compute<List<PsiClass>, RuntimeException> {
+            val classes = mutableListOf<PsiClass>()
+            val psiManager = PsiManager.getInstance(project)
+            
+            try {
+                // 遍历项目中的所有文件来查找类
+                val rootDir = project.baseDir ?: return@compute emptyList<PsiClass>()
+                collectClassesFromDirectory(rootDir, className, classes, psiManager)
+                classes
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
         }
     }
     
@@ -231,16 +236,18 @@ class UsagesService(private val project: Project) {
      * 根据方法名查找所有匹配的方法
      */
     private fun findMethodsByName(methodName: String): List<PsiMethod> {
-        val methods = mutableListOf<PsiMethod>()
-        
-        try {
-            // 遍历项目中的所有类来查找方法
-            val rootDir = project.baseDir ?: return emptyList()
-            collectMethodsFromDirectory(rootDir, methodName, methods, PsiManager.getInstance(project))
-            return methods
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return emptyList()
+        return ReadAction.compute<List<PsiMethod>, RuntimeException> {
+            val methods = mutableListOf<PsiMethod>()
+            
+            try {
+                // 遍历项目中的所有类来查找方法
+                val rootDir = project.baseDir ?: return@compute emptyList<PsiMethod>()
+                collectMethodsFromDirectory(rootDir, methodName, methods, PsiManager.getInstance(project))
+                methods
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
         }
     }
     
@@ -278,27 +285,30 @@ class UsagesService(private val project: Project) {
      * 查找指定 PSI 元素的所有引用
      */
     private fun findUsages(element: PsiElement): List<PsiElement> {
-        val usages = mutableListOf<PsiElement>()
-        val targetName = when (element) {
-            is PsiClass -> element.name
-            is PsiMethod -> element.name
-            is PsiField -> element.name
-            is PsiVariable -> element.name
-            else -> element.text
-        }
-        
-        if (targetName == null) {
-            return emptyList()
-        }
-        
-        try {
-            val psiManager = PsiManager.getInstance(project)
-            val rootDir = project.baseDir ?: return emptyList()
-            collectUsagesFromDirectory(rootDir, targetName, usages, psiManager)
-            return usages
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return emptyList()
+        return ReadAction.compute<List<PsiElement>, RuntimeException> {
+            val usages = mutableListOf<PsiElement>()
+            
+            val targetName = when (element) {
+                is PsiClass -> element.name
+                is PsiMethod -> element.name
+                is PsiField -> element.name
+                is PsiVariable -> element.name
+                else -> element.text
+            }
+            
+            if (targetName == null) {
+                return@compute emptyList<PsiElement>()
+            }
+            
+            try {
+                val psiManager = PsiManager.getInstance(project)
+                val rootDir = project.baseDir ?: return@compute emptyList<PsiElement>()
+                collectUsagesFromDirectory(rootDir, targetName, usages, psiManager)
+                usages
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
         }
     }
     

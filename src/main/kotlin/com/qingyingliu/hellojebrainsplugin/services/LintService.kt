@@ -11,6 +11,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
 import com.intellij.util.Processors
 import java.io.File
+import com.intellij.openapi.application.ReadAction
 
 /**
  * 代码检查服务
@@ -34,7 +35,10 @@ class LintService(private val project: Project) {
 
         val builder = StringBuilder("🔍 代码检查问题：\n\n")
         for (virtualFile in openFiles) {
-            val result = analyzeFileForLint(virtualFile)
+            // 在 ReadAction 中执行 PSI 访问相关逻辑，避免线程违规
+            val result = com.intellij.openapi.application.ReadAction.compute<String, RuntimeException> {
+                analyzeFileForLint(virtualFile)
+            }
             builder.append(result)
         }
         return builder.toString()
@@ -79,7 +83,9 @@ class LintService(private val project: Project) {
                    "💡 提示：请确保文件存在且有读取权限。"
         }
 
-        val result = analyzeFileForLint(virtualFile)
+        val result = com.intellij.openapi.application.ReadAction.compute<String, RuntimeException> {
+            analyzeFileForLint(virtualFile)
+        }
         builder.append(result)
         return builder.toString()
     }
