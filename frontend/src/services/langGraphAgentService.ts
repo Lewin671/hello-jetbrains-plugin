@@ -1,5 +1,6 @@
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatOllama } from "@langchain/ollama";
+import { ChatOpenAI } from "@langchain/openai";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { ENV_CONFIG, validateConfig } from "../config/env";
@@ -72,14 +73,36 @@ export class LangGraphAgentService {
     }
 
     try {
-      // 使用 Ollama granite3.3:8b 模型
-      const model = new ChatOllama({
-        baseUrl: ENV_CONFIG.OLLAMA_CONFIG.baseUrl,
-        model: ENV_CONFIG.OLLAMA_CONFIG.model,
-        temperature: ENV_CONFIG.OLLAMA_CONFIG.temperature,
-      });
-
-      console.log('🤖 Creating ReAct agent with model:', ENV_CONFIG.OLLAMA_CONFIG.model);
+      let model;
+      
+      if (ENV_CONFIG.MODEL_PROVIDER === 'openai') {
+        // 使用 OpenAI 模型
+        model = new ChatOpenAI({
+          apiKey: ENV_CONFIG.OPENAI_CONFIG.apiKey,
+          model: ENV_CONFIG.OPENAI_CONFIG.model,
+          temperature: ENV_CONFIG.OPENAI_CONFIG.temperature,
+        });
+        console.log('🤖 Creating ReAct agent with OpenAI model:', ENV_CONFIG.OPENAI_CONFIG.model);
+      } else if (ENV_CONFIG.MODEL_PROVIDER === 'deepseek') {
+        // 使用 DeepSeek 模型 (通过 OpenAI 兼容的 API)
+        model = new ChatOpenAI({
+          apiKey: ENV_CONFIG.DEEPSEEK_CONFIG.apiKey,
+          model: ENV_CONFIG.DEEPSEEK_CONFIG.model,
+          temperature: ENV_CONFIG.DEEPSEEK_CONFIG.temperature,
+          configuration: {
+            baseURL: ENV_CONFIG.DEEPSEEK_CONFIG.baseUrl,
+          },
+        });
+        console.log('🤖 Creating ReAct agent with DeepSeek model:', ENV_CONFIG.DEEPSEEK_CONFIG.model);
+      } else {
+        // 使用 Ollama 模型
+        model = new ChatOllama({
+          baseUrl: ENV_CONFIG.OLLAMA_CONFIG.baseUrl,
+          model: ENV_CONFIG.OLLAMA_CONFIG.model,
+          temperature: ENV_CONFIG.OLLAMA_CONFIG.temperature,
+        });
+        console.log('🤖 Creating ReAct agent with Ollama model:', ENV_CONFIG.OLLAMA_CONFIG.model);
+      }
 
       // 创建ReAct agent
       this.agent = createReactAgent({
@@ -95,7 +118,7 @@ export class LangGraphAgentService {
       // tools 
       console.log('🔧 Agent tools:', this.agent);
       this.isInitialized = true;
-      console.log("✅ LangGraph Agent initialized successfully with Ollama model");
+      console.log(`✅ LangGraph Agent initialized successfully with ${ENV_CONFIG.MODEL_PROVIDER} model`);
     } catch (error) {
       console.error("❌ Failed to initialize LangGraph Agent:", error);
       throw error;
