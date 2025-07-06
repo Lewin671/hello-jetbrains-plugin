@@ -200,13 +200,21 @@ body {
 }
 
 /* --- 工具调用样式 --- */
-.tool-call-info {
+.tool-calls-container {
     margin-top: 8px;
+}
+
+.tool-call-info {
+    margin-bottom: 8px;
     padding: 8px 12px;
     background-color: var(--jb-tooltip-background-color, #f8f9fa);
     border: 1px solid var(--jb-border-color, #e9ecef);
     border-radius: 6px;
     font-size: 12px;
+}
+
+.tool-call-info:last-child {
+    margin-bottom: 0;
 }
 
 .tool-header {

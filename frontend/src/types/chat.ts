@@ -8,6 +8,12 @@ export interface Message {
     toolOutput: string;
     timestamp: string;
   };
+  toolCalls?: {
+    toolName: string;
+    toolInput: any;
+    toolOutput: string;
+    timestamp: string;
+  }[];
 }
 
 export interface ChatState {

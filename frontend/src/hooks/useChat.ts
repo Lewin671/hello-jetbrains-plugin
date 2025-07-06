@@ -71,6 +71,8 @@ export const useChat = () => {
 
     let assistantMessage = '';
     let isFirstChunk = true;
+    let toolCalls: { toolName: string; toolInput: any; toolOutput: string; timestamp: string }[] = [];
+    let assistantMessageIndex = -1;
 
     try {
       console.log('Calling ChatService.sendMessageWithStreaming...');
@@ -83,8 +85,20 @@ export const useChat = () => {
             // 检测是否为工具调用消息（但不在这里创建工具调用消息，由onToolCall回调处理）
             const TOOL_PREFIX = '🔧 使用了 ';
             if (chunk.startsWith(TOOL_PREFIX)) {
-              // 工具调用消息不作为普通文本消息处理，直接返回
+              // 工具调用消息不作为普通文本消息处理，但如果是第一个chunk，需要创建助手消息
               console.log('🔧 Tool call chunk detected, will be handled by onToolCall callback');
+              
+              if (isFirstChunk) {
+                // 创建一个空的助手消息作为容器
+                const newMsg = createMessage('', 'assistant');
+                setState(prev => {
+                  const newMessages = [...prev.messages, newMsg];
+                  assistantMessageIndex = newMessages.length - 1;
+                  return { ...prev, messages: newMessages };
+                });
+                isFirstChunk = false;
+                console.log('Created empty assistant message container for tool calls');
+              }
               return;
             }
 
@@ -94,7 +108,11 @@ export const useChat = () => {
               console.log('Creating first assistant message:', assistantMessage);
 
               const newMsg = createMessage(assistantMessage, 'assistant');
-              setState(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
+              setState(prev => {
+                const newMessages = [...prev.messages, newMsg];
+                assistantMessageIndex = newMessages.length - 1;
+                return { ...prev, messages: newMessages };
+              });
               isFirstChunk = false;
             } else {
               // 后续chunk时更新最后一条消息
@@ -103,8 +121,8 @@ export const useChat = () => {
               setState(prev => ({
                 ...prev,
                 messages: prev.messages.map((msg, index) => 
-                  index === prev.messages.length - 1 
-                    ? { ...msg, content: assistantMessage }
+                  index === assistantMessageIndex 
+                    ? { ...msg, content: assistantMessage, toolCalls: toolCalls.length > 0 ? toolCalls : undefined }
                     : msg
                 )
               }));
@@ -112,15 +130,55 @@ export const useChat = () => {
           },
           onToolCall: (toolCall) => {
             console.log('🔧 Tool call detected:', toolCall);
-            // 创建工具调用消息
-            addToolCallMessage(toolCall);
+            // 将工具调用添加到数组中，而不是创建新消息
+            const toolCallWithTimestamp = {
+              ...toolCall,
+              timestamp: new Date().toISOString()
+            };
+            toolCalls.push(toolCallWithTimestamp);
+            
+            // 更新助手消息，包含所有工具调用
+            setState(prev => ({
+              ...prev,
+              messages: prev.messages.map((msg, index) => 
+                index === assistantMessageIndex 
+                  ? { 
+                      ...msg, 
+                      toolCalls: [...toolCalls],
+                      content: msg.content || assistantMessage
+                    }
+                  : msg
+              )
+            }));
+            
+            console.log('🔧 Tool call added to assistant message:', toolCallWithTimestamp);
+            console.log('🔧 Current assistantMessageIndex:', assistantMessageIndex);
+            console.log('🔧 Current toolCalls array:', toolCalls);
           },
           onSuccess: (finalMessage: string) => {
             // 流式响应完成
             console.log('onSuccess called with:', finalMessage);
+            
+            // 确保最终消息包含所有工具调用
+            if (assistantMessageIndex >= 0) {
+              setState(prev => ({
+                ...prev,
+                messages: prev.messages.map((msg, index) => 
+                  index === assistantMessageIndex 
+                    ? { 
+                        ...msg, 
+                        content: finalMessage || assistantMessage,
+                        toolCalls: toolCalls.length > 0 ? toolCalls : undefined
+                      }
+                    : msg
+                )
+              }));
+            }
+            
             setIsTyping(false);
             setIsDisabled(false);
             console.log('Message sent successfully:', finalMessage);
+            console.log('Final toolCalls array:', toolCalls);
           },
           onFailure: (error: string) => {
             console.error('onFailure called with:', error);
