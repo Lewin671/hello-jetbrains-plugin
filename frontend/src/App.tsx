@@ -18,7 +18,9 @@ function App() {
     isTyping,
     isDisabled,
     setInputValue,
-    sendMessage
+    sendMessage,
+    addMessage,
+    addToolCallMessage
   } = useChat();
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,6 +54,25 @@ function App() {
   const handleTestTools = async () => {
     console.log('开始测试 Tools...');
     await LangGraphAgentService.testTools();
+  };
+
+  const handleDemoToolCall = () => {
+    console.log('演示工具调用...');
+    sendMessage('今天天气怎么样？请帮我搜索一下。');
+  };
+
+  const handleSimpleToolTest = () => {
+    console.log('简单工具调用测试...');
+    // 直接创建一个工具调用消息来测试显示
+    const testToolCall = {
+      toolName: 'search',
+      toolInput: { query: '今天天气怎么样？' },
+      toolOutput: '今天天气晴朗，温度25度，适合外出活动。'
+    };
+    
+    // 使用addToolCallMessage函数来测试工具调用显示
+    addToolCallMessage(testToolCall);
+    console.log('🔧 Tool call message added:', testToolCall);
   };
 
   return (
@@ -117,6 +138,36 @@ function App() {
           }}
         >
           测试Tools
+        </button>
+        <button 
+          onClick={handleDemoToolCall}
+          style={{
+            marginLeft: '5px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            backgroundColor: '#6f42c1',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          演示工具调用
+        </button>
+        <button 
+          onClick={handleSimpleToolTest}
+          style={{
+            marginLeft: '5px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            backgroundColor: '#fd7e14',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          简单工具测试
         </button>
       </div>
       

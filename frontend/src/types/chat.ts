@@ -2,6 +2,12 @@ export interface Message {
   id: string;
   content: string;
   sender: 'user' | 'assistant';
+  toolCall?: {
+    toolName: string;
+    toolInput: any;
+    toolOutput: string;
+    timestamp: string;
+  };
 }
 
 export interface ChatState {

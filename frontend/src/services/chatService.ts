@@ -6,6 +6,7 @@ export class ChatService {
     message: string, 
     callbacks: SendMessageCallback & {
       onChunk?: (chunk: string) => void;
+      onToolCall?: (toolCall: { toolName: string; toolInput: any; toolOutput: string }) => void;
     }
   ): Promise<void> {
     try {
@@ -15,7 +16,8 @@ export class ChatService {
       await LangGraphAgentService.sendMessageWithStreaming(
         message,
         callbacks.onChunk || (() => {}),
-        callbacks.onSuccess || (() => {})
+        callbacks.onSuccess || (() => {}),
+        callbacks.onToolCall
       );
     } catch (error) {
       console.error("LangGraph Agent streaming failed:", error);
