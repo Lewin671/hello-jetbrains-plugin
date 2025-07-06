@@ -276,14 +276,75 @@ export class LangGraphAgentService {
         // 处理 tools 消息块 (工具调用返回的消息)
         if (chunk.tools && chunk.tools.messages) {
           const toolMsgs = Array.isArray(chunk.tools.messages) ? chunk.tools.messages : [chunk.tools.messages];
-          if (toolMsgs.length > 0) {
-            const lastToolMsg = toolMsgs[toolMsgs.length - 1];
-            if (typeof lastToolMsg === 'object' && lastToolMsg && 'content' in lastToolMsg && lastToolMsg.content) {
-              const tContent = String(lastToolMsg.content);
+          console.log(`🔧 Processing ${toolMsgs.length} tool messages`);
+          
+          // 处理所有工具消息，而不是只处理最后一条
+          for (let i = 0; i < toolMsgs.length; i++) {
+            const toolMsg = toolMsgs[i];
+            if (typeof toolMsg === 'object' && toolMsg && 'content' in toolMsg && toolMsg.content) {
+              const tContent = String(toolMsg.content);
               if (tContent.trim() !== '') {
-                console.log('工具调用消息内容:', tContent);
-                finalMessage = tContent; // 更新最终消息，但更重要的是实时回调
-                onChunk(tContent);
+                console.log(`工具调用消息内容 ${i + 1}/${toolMsgs.length}:`, tContent);
+                finalMessage = tContent; // 更新最终消息
+                onChunk(tContent); // 发送每条工具消息到聊天面板
+                
+                // 提取工具调用信息并调用onToolCall回调
+                if (onToolCall) {
+                  try {
+                    // 尝试从不同的位置获取工具信息
+                    let toolName = 'unknown';
+                    let toolContent = tContent;
+                    
+                    // 从toolMsg.kwargs获取工具名称
+                    if (toolMsg.kwargs && toolMsg.kwargs.name) {
+                      toolName = toolMsg.kwargs.name;
+                    }
+                    
+                    // 从toolMsg.kwargs获取内容
+                    if (toolMsg.kwargs && toolMsg.kwargs.content) {
+                      toolContent = toolMsg.kwargs.content;
+                    }
+                    
+                    // 如果还是unknown，尝试从内容中解析工具名称
+                    if (toolName === 'unknown') {
+                      const TOOL_PREFIX = '🔧 使用了 ';
+                      if (toolContent.startsWith(TOOL_PREFIX)) {
+                        const firstLine = toolContent.split('\n')[0];
+                        toolName = firstLine.replace(TOOL_PREFIX, '').replace(' 工具', '').trim();
+                      }
+                    }
+                    
+                    // 解析工具调用内容，提取输入和输出
+                    const lines = toolContent.split('\n');
+                    const inputLine = lines.find((l: string) => l.startsWith('输入:')) || '';
+                    const outputLine = lines.find((l: string) => l.startsWith('输出:')) || '';
+                    
+                    const toolInputStr = inputLine.replace('输入:', '').trim();
+                    const toolOutput = outputLine.replace('输出:', '').trim();
+                    
+                    let toolInput: any = toolInputStr;
+                    try { 
+                      toolInput = JSON.parse(toolInputStr); 
+                    } catch { 
+                      // 如果不是JSON，保持原始字符串
+                    }
+                    
+                    // 调用工具调用回调
+                    onToolCall({
+                      toolName: toolName,
+                      toolInput: toolInput,
+                      toolOutput: toolOutput
+                    });
+                    
+                    console.log(`🔧 Tool call callback triggered for ${toolName}`, {
+                      toolName,
+                      toolInput,
+                      toolOutput
+                    });
+                  } catch (error) {
+                    console.warn('Failed to parse tool call info:', error);
+                  }
+                }
               }
             }
           }

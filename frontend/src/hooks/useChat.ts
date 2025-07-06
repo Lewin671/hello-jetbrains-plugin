@@ -71,7 +71,6 @@ export const useChat = () => {
 
     let assistantMessage = '';
     let isFirstChunk = true;
-    let pendingToolCall: { toolName: string; toolInput: any; toolOutput: string } | null = null;
 
     try {
       console.log('Calling ChatService.sendMessageWithStreaming...');
@@ -81,25 +80,12 @@ export const useChat = () => {
           onChunk: (chunk: string) => {
             console.log('onChunk called with:', chunk, 'isFirstChunk:', isFirstChunk);
 
-            // 检测是否为工具调用消息
+            // 检测是否为工具调用消息（但不在这里创建工具调用消息，由onToolCall回调处理）
             const TOOL_PREFIX = '🔧 使用了 ';
             if (chunk.startsWith(TOOL_PREFIX)) {
-              try {
-                const lines = chunk.split('\n');
-                const firstLine = lines[0];
-                const toolName = firstLine.replace(TOOL_PREFIX, '').replace(' 工具', '').trim();
-                const inputLine = lines.find(l => l.startsWith('输入:')) || '';
-                const outputLine = lines.find(l => l.startsWith('输出:')) || '';
-                const toolInputStr = inputLine.replace('输入:', '').trim();
-                const toolOutput = outputLine.replace('输出:', '').trim();
-                let toolInput: any = toolInputStr;
-                try { toolInput = JSON.parse(toolInputStr); } catch { /* not JSON */ }
-
-                pendingToolCall = { toolName, toolInput, toolOutput };
-              } catch (e) {
-                console.warn('Failed to parse tool call chunk', e);
-              }
-              return; // 不处理为普通chunk
+              // 工具调用消息不作为普通文本消息处理，直接返回
+              console.log('🔧 Tool call chunk detected, will be handled by onToolCall callback');
+              return;
             }
 
             if (isFirstChunk) {
@@ -108,13 +94,6 @@ export const useChat = () => {
               console.log('Creating first assistant message:', assistantMessage);
 
               const newMsg = createMessage(assistantMessage, 'assistant');
-              if (pendingToolCall) {
-                newMsg.toolCall = {
-                  ...pendingToolCall,
-                  timestamp: new Date().toISOString()
-                };
-                pendingToolCall = null; // reset
-              }
               setState(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
               isFirstChunk = false;
             } else {
