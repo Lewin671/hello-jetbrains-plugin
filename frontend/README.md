@@ -11,6 +11,7 @@
 - 🔄 输入状态指示器
 - 📱 响应式布局设计
 - 🎨 自定义滚动条样式
+- 🚀 支持 Ollama 本地模型
 
 ## 技术栈
 
@@ -18,6 +19,42 @@
 - **TypeScript** - 类型安全的 JavaScript
 - **CSS Variables** - 主题系统支持
 - **JCEF Bridge** - 与 Kotlin 后端的通信
+- **LangChain** - AI 模型集成
+- **Ollama** - 本地大语言模型
+
+## Ollama 配置
+
+本项目使用 Ollama 作为 AI 模型后端，支持本地运行的大语言模型。
+
+### 安装 Ollama
+
+1. 访问 [Ollama 官网](https://ollama.ai/) 下载并安装
+2. 启动 Ollama 服务
+
+### 下载模型
+
+```bash
+# 下载 granite3.3:8b 模型
+ollama pull granite3.3:8b
+```
+
+### 环境变量配置
+
+创建 `.env` 文件并设置：
+
+```env
+# Ollama 服务地址 (默认: http://localhost:11434)
+REACT_APP_OLLAMA_BASE_URL=http://localhost:11434
+```
+
+### 验证连接
+
+启动应用后，可以在浏览器控制台运行：
+
+```javascript
+import { testOllamaConnection } from './src/services/ollamaTest';
+testOllamaConnection();
+```
 
 ## 主题支持
 

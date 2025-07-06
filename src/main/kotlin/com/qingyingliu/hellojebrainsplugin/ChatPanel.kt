@@ -49,6 +49,6 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     private fun loadChatInterface() {
-        browser.loadURL("http://192.168.7.136:3000")
+        browser.loadURL("http://localhost:3000")
     }
 }

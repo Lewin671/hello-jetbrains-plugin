@@ -78,7 +78,7 @@ val compileFrontend by tasks.registering(com.github.gradle.node.npm.task.NpmTask
     args.set(listOf("run", "build"))
 }
 
-// Make sure backend build depends on frontend build
-tasks.named("runIde") {
-    dependsOn(compileFrontend)
-}
+//// Make sure backend build depends on frontend build
+//tasks.named("runIde") {
+//    dependsOn(compileFrontend)
+//}

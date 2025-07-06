@@ -2,12 +2,12 @@ import React, { useRef } from 'react';
 import './App.css';
 import { useChat } from './hooks/useChat';
 import { useAutoScroll } from './hooks/useAutoScroll';
-import { ChatService } from './services/chatService';
 import { MessageItem } from './components/MessageItem';
 import { ChatInput } from './components/ChatInput';
 import { TypingIndicator } from './components/TypingIndicator';
 import { CHAT_CONSTANTS } from './constants/chat';
 import { isValidMessage, focusInput } from './utils/chatUtils';
+import { testOllamaAndAgent, testStreamingAgent, testOllamaStreaming } from './services/ollamaTest';
 
 function App() {
   const {
@@ -15,11 +15,8 @@ function App() {
     inputValue,
     isTyping,
     isDisabled,
-    addMessage,
     setInputValue,
-    setIsTyping,
-    setIsDisabled,
-    clearInput
+    sendMessage
   } = useChat();
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -27,36 +24,79 @@ function App() {
 
   const handleSend = () => {
     if (!isValidMessage(inputValue)) return;
-
-    addMessage(inputValue.trim(), 'user');
-    clearInput();
     
-    // 禁用输入和按钮，防止重复发送
-    setIsDisabled(true);
-    setIsTyping(true);
+    sendMessage(inputValue.trim());
+    focusInput(inputRef);
+  };
 
-    ChatService.sendMessage(
-      inputValue.trim(),
-      {
-        onSuccess: (response: string) => {
-          setIsTyping(false);
-          addMessage(response, 'assistant');
-          setIsDisabled(false);
-          focusInput(inputRef);
-        },
-        onFailure: (error: string) => {
-          setIsTyping(false);
-          addMessage(`${CHAT_CONSTANTS.ERROR_PREFIX}${error}`, 'assistant');
-          setIsDisabled(false);
-          focusInput(inputRef);
-        }
-      }
-    );
+  const handleTest = async () => {
+    console.log('开始测试...');
+    const result = await testOllamaAndAgent();
+    console.log('测试结果:', result);
+  };
+
+  const handleStreamingTest = async () => {
+    console.log('开始流式测试...');
+    const result = await testStreamingAgent();
+    console.log('流式测试结果:', result);
+  };
+
+  const handleOllamaStreamingTest = async () => {
+    console.log('开始 Ollama 流式测试...');
+    const result = await testOllamaStreaming();
+    console.log('Ollama 流式测试结果:', result);
   };
 
   return (
     <div className="chat-container">
-      <div className="chat-header">{CHAT_CONSTANTS.HEADER_TEXT}</div>
+      <div className="chat-header">
+        {CHAT_CONSTANTS.HEADER_TEXT}
+        <button 
+          onClick={handleTest}
+          style={{
+            marginLeft: '10px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          测试Agent
+        </button>
+        <button 
+          onClick={handleStreamingTest}
+          style={{
+            marginLeft: '5px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            backgroundColor: '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          测试流式
+        </button>
+        <button 
+          onClick={handleOllamaStreamingTest}
+          style={{
+            marginLeft: '5px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            backgroundColor: '#ffc107',
+            color: 'black',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          测试Ollama流式
+        </button>
+      </div>
       
       <div className="chat-messages">
         {messages.map((message) => (
