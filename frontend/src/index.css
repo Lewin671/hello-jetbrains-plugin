@@ -1,13 +1,53 @@
+/* --- 全局和主题变量 --- */
+/*
+ * 这些 CSS 变量 (--jb-...) 由 IntelliJ JCEF 浏览器环境提供。
+ * 它们能让界面自动适应 IDE 的亮色或暗色主题。
+ * 后面的值是备用值，用于在普通浏览器中预览。
+ */
+:root {
+    /* 默认值 (亮色主题) */
+    --bg-color: var(--jb-background-color, #ffffff);
+    --text-color: var(--jb-text-color, #222222);
+    --border-color: var(--jb-border-color, #d0d0d0);
+    --input-bg-color: var(--jb-editor-background-color, #ffffff);
+    --button-bg-color: var(--jb-button-background-color, #f0f0f0);
+    --button-text-color: var(--jb-button-foreground-color, #222222);
+    --button-hover-bg-color: var(--jb-button-hover-background-color, #e0e0e0);
+    --accent-color: var(--jb-link-color, #0d6efd);
+    --user-message-bg: #e7f1ff;
+    --assistant-message-bg: var(--jb-content-background-color, #f2f2f2);
+
+    /* 暗色主题下的颜色覆盖 */
+    --user-message-bg-dark: #3b5980;
+    --assistant-message-bg-dark: #3c3f41;
+}
+
+/*
+ * 当 JCEF 处于暗色模式 (Darcula) 时，<html> 标签会自动获得 'Theme--Darcula' 类。
+ * 我们用这个类来切换到暗色主题的颜色变量。
+ */
+html[class*="Theme--Darcula"] {
+     --user-message-bg: var(--user-message-bg-dark);
+     --assistant-message-bg: var(--assistant-message-bg-dark);
+}
+
+/* --- 基础样式 --- */
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    margin: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    overflow: hidden; /* 防止body滚动，让容器滚动 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+    box-sizing: border-box;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+        monospace;
 }

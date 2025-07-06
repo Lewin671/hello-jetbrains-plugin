@@ -1,46 +1,95 @@
-# Getting Started with Create React App
+# AI 助手 React 前端
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+这是一个基于 React 和 TypeScript 的 AI 聊天界面，专为 IntelliJ IDEA 插件设计。
 
-## Available Scripts
+## 功能特性
 
-In the project directory, you can run:
+- 🤖 现代化的聊天界面设计
+- 🌓 自动适应 IDE 的亮色/暗色主题
+- 💬 实时消息交互
+- ⌨️ 支持回车键发送消息
+- 🔄 输入状态指示器
+- 📱 响应式布局设计
+- 🎨 自定义滚动条样式
 
-### `npm start`
+## 技术栈
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- **React 19** - 现代化的 React 框架
+- **TypeScript** - 类型安全的 JavaScript
+- **CSS Variables** - 主题系统支持
+- **JCEF Bridge** - 与 Kotlin 后端的通信
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## 主题支持
 
-### `npm test`
+该界面使用 CSS 变量系统，能够自动适应 IntelliJ IDEA 的主题：
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **亮色主题**: 使用浅色背景和深色文字
+- **暗色主题 (Darcula)**: 自动切换到深色背景和浅色文字
+- **备用值**: 在普通浏览器中提供合理的默认样式
 
-### `npm run build`
+## 组件结构
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```
+App.tsx
+├── Chat Container (主容器)
+├── Chat Header (标题栏)
+├── Chat Messages (消息区域)
+│   ├── Welcome Message (欢迎消息)
+│   ├── User Messages (用户消息)
+│   └── Assistant Messages (AI 消息)
+├── Typing Indicator (输入指示器)
+└── Chat Input (输入区域)
+    ├── Message Input (文本输入框)
+    └── Send Button (发送按钮)
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 与后端通信
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+界面通过 `window.sendMessage` 函数与 Kotlin 后端进行通信：
 
-### `npm run eject`
+```typescript
+window.sendMessage(
+  message: string,
+  onSuccess: (response: string) => void,
+  onFailure: (error: string) => void
+)
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## 开发
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+# 安装依赖
+npm install
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+# 启动开发服务器
+npm start
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+# 构建生产版本
+npm run build
 
-## Learn More
+# 运行测试
+npm test
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 样式系统
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+样式文件分为两部分：
+
+- `index.css` - 全局样式和主题变量
+- `App.css` - 组件特定样式
+
+所有样式都使用 CSS 变量，确保与 IDE 主题的一致性。
+
+## 浏览器兼容性
+
+- Chrome (推荐)
+- Firefox
+- Safari
+- Edge
+
+## 注意事项
+
+- 该界面设计为在 IntelliJ IDEA 的 JCEF 环境中运行
+- 支持键盘快捷键 (Enter 发送消息)
+- 自动滚动到最新消息
+- 防止重复发送消息
